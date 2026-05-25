@@ -2,9 +2,10 @@ import json
 import random
 import os
 import hashlib
-import requests  # Работает мгновенно на ПК и без лагов в потоках
+import requests  
 import urllib3
-import threading  # Фикс лагов: фоновые потоки для сохранений
+import threading
+import time
 from kivy.app import App
 from kivy.uix.screenmanager import ScreenManager, Screen
 from kivy.uix.boxlayout import BoxLayout
@@ -88,7 +89,6 @@ class RegistrationScreen(Screen):
         app.nickname = nick
         app.temp_pass = hashlib.sha256(pw.encode()).hexdigest()
         self.info_label.text = "Связь с сервером..."
-        # Запускаем вход в отдельном потоке, чтобы окно Kivy не зависало
         threading.Thread(target=app.cloud_login, daemon=True).start()
 
 # --- 2. ГЛАВНЫЙ ЭКРАН ---
@@ -220,7 +220,6 @@ class ShopScreen(Screen):
 # --- 4. МИРОВОЙ ТОП-10 ---
 class LeaderboardScreen(Screen):
     def on_enter(self):
-# --- ПРИМЕЧАНИЕ: Этот фрагмент начинается внутри класса LeaderboardScreen ---
         self.layout.clear_widgets()
         self.layout.add_widget(Label(text="ЗАГРУЗКА МИРОВОГО ТОПА...", size_hint_y=None, height='50dp'))
         threading.Thread(target=self.load_top, daemon=True).start()
@@ -268,6 +267,7 @@ class LeaderboardScreen(Screen):
 # --- 5. ЛОГИКА ПРИЛОЖЕНИЯ И ОБЛАКА ---
 class CyberClickerApp(App):
     def build(self):
+        self.last_click_time = 0
         self.title = "Cyber Clicker"
         self.nickname = "GUEST"
         self.temp_pass = ""
@@ -360,22 +360,6 @@ class CyberClickerApp(App):
     def enter_game(self):
         self.sm.current = 'main'
 
-    def click(self):
-        if self.current_brawler == "Школьник-Читер":
-            gained = 150 if random.random() < 0.50 else 0
-            self.score += gained
-        elif self.current_brawler == "ISKA25k":
-            gained = 200 if random.random() < 0.15 else 50
-            self.score += gained
-        else:
-            self.score += int(self.income * (1 + self.rebirths * 0.5))
-        
-        self.local_save_only()
-        self.click_count += 1
-        if self.click_count >= 10:
-            self.click_count = 0
-            self.save_to_cloud_tick(0)
-
     def add_passive(self, dt):
         if self.sm.current != 'auth':
             self.score += self.passive_income
@@ -413,7 +397,19 @@ class CyberClickerApp(App):
         self.save_to_cloud_tick(0)
 
     def get_rebirth_cost(self):
-        return (self.rebirths + 1) * 10000
+        # Если перерождений 0, то цена для 1-го перерождения
+        if self.rebirths == 0:
+            return 1000000  # Твоя цена для 1-го перерождения (например, 5k)
+        # Если перерождение уже 1, то цена для 2-го
+        elif self.rebirths == 1:
+            return 5000000  # Твоя цена для 2-го перерождения (например, 25k)
+        # Если перерождений 2, то цена для 3-го
+        elif self.rebirths == 2:
+            return 25000000  # Твоя цена для 3-го перерождения (например, 100k)
+        # Для всех остальных (4-го, 5-го и далее) цена будет расти автоматически
+        else:
+            return (self.rebirths + 1) * 50000000
+
 
     def do_rebirth(self):
         cost = self.get_rebirth_cost()
@@ -424,20 +420,34 @@ class CyberClickerApp(App):
             self.current_brawler = "Новичок"
             self.owned_brawlers = ["Новичок"]
             self.rebirths += 1
+            
+            # ФИЧА №1: Полный сброс цен в магазине до начальных при перерождении
+            self.prices = {
+                "case_normal": 100, "case_epic": 1000, "case_legendary": 10000,
+                "farm": 150, "double": 200, "hero_sl": 5000, "hero_hacker": 15000, "hero_iska": 25000       
+            }
+            
             self.local_save_only()
             self.force_cloud_save()
 
-    def get_price(self, key):
-        return self.prices.get(key, 0)
-
     def buy(self, key, name, power, is_hero):
+        # ФИЧА №2: Блокировка покупки персонажей по перерождениям
+        if key == "hero_hacker" and self.rebirths < 2:
+            self.show_popup("БЛОКИРОВКА!", "Для покупки Хакера нужно минимум 2 перерождения!")
+            return
+        if key == "hero_iska" and self.rebirths < 3:
+            self.show_popup("БЛОКИРОВКА!", "Для покупки ISKA25k нужно минимум 3 перерождения!")
+            return
+
         price = self.get_price(key)
         if self.score >= price:
             self.score -= price
+            
             if is_hero:
                 brawler_name = name.replace("ГЕРОЙ: ", "")
                 self.current_brawler = brawler_name
-                if brawler_name not in self.owned_brawlers: self.owned_brawlers.append(brawler_name)
+                if brawler_name not in self.owned_brawlers: 
+                    self.owned_brawlers.append(brawler_name)
                 self.income += power
             elif key == "farm":
                 self.passive_income += 5
@@ -474,7 +484,7 @@ class CyberClickerApp(App):
                     self.score += 7500
                     self.show_popup("ЛЕГЕНДАРНЫЙ КЕЙС", "Вы выиграли 7,500 💎!")
                 elif rand < 0.97:
-                    if "Хакer" in self.owned_brawlers:
+                    if "Хакер" in self.owned_brawlers:
                         self.score += 15000
                         self.show_popup("ДУБЛИКАТ!", "Хакер уже есть! Возвращено 15k 💎")
                     else:
@@ -495,6 +505,40 @@ class CyberClickerApp(App):
             self.local_save_only()
             self.force_cloud_save()
             if self.sm.has_screen('shop'): self.sm.get_screen('shop').update_buttons()
+
+    def click(self):
+        current_time = time.time()
+        # Проверяем интервал: если прошло меньше 0.1 секунды — это автокликер!
+        if current_time - self.last_click_time < 0.10:
+            # Меняем текст на главной кнопке через ScreenManager
+            if self.sm.has_screen('main'):
+                self.sm.get_screen('main').btn_click.text = "ЗАЩИТА! 🤖"
+                # Возвращаем нормальный текст кнопки через 0.5 секунд
+                Clock.schedule_once(lambda dt: setattr(self.sm.get_screen('main').btn_click, 'text', "ХАКНУТЬ"), 0.5)
+            return # Выходим из функции, алмазы НЕ начисляются!
+            
+        # Если проверка пройдена, запоминаем время текущего успешного клика
+        self.last_click_time = current_time
+
+        # --- Твоя обычная логика начисления алмазов ---
+        if self.current_brawler == "Школьник-Читер":
+            gained = 150 if random.random() < 0.40 else 0
+            self.score += gained
+        elif self.current_brawler == "ISKA25k":
+            gained = 200 if random.random() < 0.15 else 50
+            self.score += gained
+        else:
+            self.score += int(self.income * (1 + self.rebirths * 0.5))
+        
+        self.local_save_only()
+        self.click_count += 1
+        if self.click_count >= 10:
+            self.click_count = 0
+            self.save_to_cloud_tick(0)
+
+
+    def get_price(self, key):
+        return self.prices.get(key, 0)
 
     def show_popup(self, title, text):
         box = BoxLayout(orientation='vertical', padding=10)
