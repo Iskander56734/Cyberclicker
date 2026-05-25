@@ -2,6 +2,9 @@ import json
 import random
 import os
 import hashlib
+import requests  # Работает мгновенно на ПК и без лагов в потоках
+import urllib3
+import threading  # Фикс лагов: фоновые потоки для сохранений
 from kivy.app import App
 from kivy.uix.screenmanager import ScreenManager, Screen
 from kivy.uix.boxlayout import BoxLayout
@@ -13,15 +16,16 @@ from kivy.uix.popup import Popup
 from kivy.clock import Clock
 from kivy.core.window import Window
 from kivy.animation import Animation
-from kivy.network.urlrequest import UrlRequest  # Фикс сборки APK: замена requests
 
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 Window.clearcolor = (0.06, 0.09, 0.16, 1)
 
-# === НАСТРОЙКИ ОБЛАКА JSONBIN ===
-JSONBIN_API_KEY = "$2a$10$u7opOqAtI6/GglRdYNy9PudA6VUkf2Ln.D/nw5KAvPTRh.Ds3Nel6"
-BIN_ID = "69f73c8c36566621a81d54ca"
+# === НАСТРОЙКИ БЕСКОНЕЧНОГО ОБЛАКА SUPABASE ===
+SUPABASE_URL = "https://supabase.co"
+SUPABASE_KEY = "sb_publishable_HvLlvVVI8fz8rR6OSIDsqQ_mgXhml-K"
 LOCAL_DB_FILE = "cyber_player_base.json"
 
+# --- Функция красивого форматирования чисел (от k до VG) ---
 def format_num(num):
     try:
         num = int(num)
@@ -56,6 +60,7 @@ def save_local_db(db):
     except:
         pass
 
+# --- 1. ЭКРАН ВХОДА ---
 class RegistrationScreen(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -83,8 +88,10 @@ class RegistrationScreen(Screen):
         app.nickname = nick
         app.temp_pass = hashlib.sha256(pw.encode()).hexdigest()
         self.info_label.text = "Связь с сервером..."
-        Clock.schedule_once(lambda dt: app.cloud_login(), 0.1)
+        # Запускаем вход в отдельном потоке, чтобы окно Kivy не зависало
+        threading.Thread(target=app.cloud_login, daemon=True).start()
 
+# --- 2. ГЛАВНЫЙ ЭКРАН ---
 class MainScreen(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -158,7 +165,7 @@ class MainScreen(Screen):
             click_text = f"x{format_num(int(self.game.income * (1 + self.game.rebirths * 0.5)))} (Бонус: +{self.game.rebirths * 50}%)"
             
         self.label_info.text = f"Хакер: {self.game.nickname} | Перерождения: {self.game.rebirths}\nГерой: {self.game.current_brawler}\nКлик: {click_text} | Пассив: +{format_num(self.game.passive_income)}/сек"
-        self.btn_rebirth.text = f"⚡ СДЕЛАТЬ ПЕРЕРОЖДЕНИЕ ⚡\nЦена: {format_num(next_cost)} 💎 | Бонус: +50% к клику"
+        self.btn_rebirth.text = f"⚡ СДЕЛАТЬ ПЕРЕРОЖДЕНИЕ ⚡\nЦена: {format_num(next_cost)} 💎 | ...+50% к клику"
         
         if self.game.score >= next_cost:
             self.btn_rebirth.opacity = 1
@@ -167,6 +174,7 @@ class MainScreen(Screen):
             self.btn_rebirth.opacity = 0
             self.btn_rebirth.disabled = True
 
+# --- 3. МАГАЗИН ---
 class ShopScreen(Screen):
     def on_enter(self):
         self.update_buttons()
@@ -209,17 +217,18 @@ class ShopScreen(Screen):
             price = self.game.get_price(key)
             btn.text = f"{name}\nЦена: {format_num(price)} 💎"
 
+# --- 4. МИРОВОЙ ТОП-10 ---
 class LeaderboardScreen(Screen):
     def on_enter(self):
+# --- ПРИМЕЧАНИЕ: Этот фрагмент начинается внутри класса LeaderboardScreen ---
         self.layout.clear_widgets()
         self.layout.add_widget(Label(text="ЗАГРУЗКА МИРОВОГО ТОПА...", size_hint_y=None, height='50dp'))
-        Clock.schedule_once(self.load_top, 0.2)
+        threading.Thread(target=self.load_top, daemon=True).start()
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.game = App.get_running_app()
         root = BoxLayout(orientation='vertical', padding=20)
-# --- ПРИМЕЧАНИЕ: Этот блок начинается внутри метода __init__ класса LeaderboardScreen ---
         root.add_widget(Label(text="🏆 МИРОВОЙ ТОП-10", size_hint_y=0.1, font_size='22sp'))
         self.layout = BoxLayout(orientation='vertical', spacing=10, size_hint_y=None)
         self.layout.bind(minimum_height=self.layout.setter('height'))
@@ -231,31 +240,30 @@ class LeaderboardScreen(Screen):
         root.add_widget(btn)
         self.add_widget(root)
 
-    def load_top(self, dt):
+    def load_top(self):
+        full_db = self.game.get_cloud_db()
+        # Возвращаемся в главный поток, чтобы обновить UI Kivy
+        Clock.schedule_once(lambda dt: self.update_top_ui(full_db), 0)
+
+    def update_top_ui(self, full_db):
         self.layout.clear_widgets()
-        self.game.get_cloud_db(self.on_top_loaded)
+        users_dict = full_db.get("users", {})
+        mock_data = []
+        for user, saved in users_dict.items():
+            if user != "__system_check__" and isinstance(saved, dict):
+                score_val = saved.get("save_data", {}).get("score", 0)
+                mock_data.append({"name": user, "score": score_val})
+        
+        mock_data = sorted(mock_data, key=lambda x: x['score'], reverse=True)[:10]
+        if not mock_data:
+            self.layout.add_widget(Label(text="Топ пуст", size_hint_y=None, height='40dp'))
+            return
 
-    def on_top_loaded(self, req, result):
-        if req.resp_status == 200:
-            users_dict = result.get("users", {})
-            mock_data = []
-            for user, saved in users_dict.items():
-                if user != "__system_check__" and isinstance(saved, dict):
-                    score_val = saved.get("save_data", {}).get("score", 0)
-                    mock_data.append({"name": user, "score": score_val})
-            
-            mock_data = sorted(mock_data, key=lambda x: x['score'], reverse=True)[:10]
-            if not mock_data:
-                self.layout.add_widget(Label(text="Топ пуст", size_hint_y=None, height='40dp'))
-                return
-
-            for i, user in enumerate(mock_data, 1):
-                self.layout.add_widget(Label(
-                    text=f"{i}. {user['name']} — {format_num(user['score'])} 💎",
-                    size_hint_y=None, height='40dp', font_size='16sp'
-                ))
-        else:
-            self.layout.add_widget(Label(text="Ошибка загрузки топа", size_hint_y=None, height='40dp'))
+        for i, user in enumerate(mock_data, 1):
+            self.layout.add_widget(Label(
+                text=f"{i}. {user['name']} — {format_num(user['score'])} 💎",
+                size_hint_y=None, height='40dp', font_size='16sp'
+            ))
 
 # --- 5. ЛОГИКА ПРИЛОЖЕНИЯ И ОБЛАКА ---
 class CyberClickerApp(App):
@@ -283,30 +291,42 @@ class CyberClickerApp(App):
         Clock.schedule_interval(self.save_to_cloud_tick, 30.0)
         return self.sm
 
-    def get_cloud_db(self, callback):
-        url = f"https://api.jsonbin.io/v3/b/{BIN_ID}/latest"
-        headers = {"X-Master-Key": JSONBIN_API_KEY, "X-Bin-Meta": "false"}
-        UrlRequest(url, on_success=callback, on_failure=callback, on_error=callback, req_headers=headers)
+    def get_cloud_db(self):
+        url = f"https://dyqkybmzhrqksdnhjsec.supabase.co/rest/v1/saves?id=eq.1&select=full_db"
+        headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
+        try:
+            res = requests.get(url, headers=headers, timeout=4)
+            if res.status_code == 200:
+                data = res.json()
+                if isinstance(data, list) and len(data) > 0:
+                    return data[0].get("full_db", {"users": {}})
+        except: pass
+        return {"users": {}}
+
 
     def update_cloud_db(self, full_db):
-        url = f"https://api.jsonbin.io/v3/b/{BIN_ID}"
-        headers = {"X-Master-Key": JSONBIN_API_KEY, "Content-Type": "application/json"}
-        req_body = json.dumps(full_db)
-        UrlRequest(url, req_body=req_body, req_headers=headers, method='PUT')
+        url = f"https://dyqkybmzhrqksdnhjsec.supabase.co/rest/v1/saves"
+        headers = {
+            "apikey": SUPABASE_KEY, 
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+            "Content-Type": "application/json", 
+            "Prefer": "resolution=merge-duplicates"
+        }
+        payload = {"id": 1, "full_db": full_db}
+        threading.Thread(target=lambda: requests.post(url, headers=headers, json=payload, timeout=4), daemon=True).start()
+
+
 
     def cloud_login(self):
-        screen = self.sm.get_screen('auth')
-        if JSONBIN_API_KEY == "ВАШ_API_КЛЮЧ_JSONBIN_ЗДЕСЬ":
-            screen.info_label.text = "Укажите JSONBIN_API_KEY!"
+        if SUPABASE_KEY == "ВСТАВЬ_СЮДА_СВОЙ_ДЛИННЫЙ_ANON_PUBLIC_КЛЮЧ":
+            Clock.schedule_once(lambda dt: self.set_auth_info("Укажите SUPABASE_KEY!"), 0)
             return
-        self.get_cloud_db(self.on_login_db_loaded)
 
-    def on_login_db_loaded(self, req, result):
-        screen = self.sm.get_screen('auth')
-        full_db = result if req.resp_status == 200 else load_local_db()
+        full_db = self.get_cloud_db()
         if "users" not in full_db:
             full_db["users"] = {}
         db = full_db["users"]
+        
         if self.nickname in db:
             saved_pass = db[self.nickname].get("password")
             if saved_pass == self.temp_pass:
@@ -318,9 +338,9 @@ class CyberClickerApp(App):
                 self.current_brawler = user_data.get("brawler", "Новичок")
                 self.owned_brawlers = user_data.get("owned_brawlers", ["Новичок"])
                 self.prices.update(user_data.get("prices", {}))
-                self.sm.current = 'main'
+                Clock.schedule_once(lambda dt: self.enter_game(), 0)
             else:
-                screen.info_label.text = "Неверный пароль!"
+                Clock.schedule_once(lambda dt: self.set_auth_info("Неверный пароль!"), 0)
         else:
             db[self.nickname] = {
                 "password": self.temp_pass,
@@ -332,7 +352,13 @@ class CyberClickerApp(App):
             }
             self.update_cloud_db(full_db)
             save_local_db(full_db)
-            self.sm.current = 'main'
+            Clock.schedule_once(lambda dt: self.enter_game(), 0)
+
+    def set_auth_info(self, text):
+        self.sm.get_screen('auth').info_label.text = text
+
+    def enter_game(self):
+        self.sm.current = 'main'
 
     def click(self):
         if self.current_brawler == "Школьник-Читер":
@@ -358,8 +384,7 @@ class CyberClickerApp(App):
     def local_save_only(self):
         if self.nickname != "GUEST" and self.sm.current != 'auth':
             local_db = load_local_db()
-            if "users" not in local_db:
-                local_db["users"] = {}
+            if "users" not in local_db: local_db["users"] = {}
             local_db["users"][self.nickname] = {
                 "password": self.temp_pass,
                 "save_data": {
@@ -373,8 +398,7 @@ class CyberClickerApp(App):
     def save_to_cloud_tick(self, dt):
         if self.nickname != "GUEST" and self.sm.current != 'auth':
             full_db = load_local_db()
-            if "users" not in full_db:
-                full_db["users"] = {}
+            if "users" not in full_db: full_db["users"] = {}
             full_db["users"][self.nickname] = {
                 "password": self.temp_pass,
                 "save_data": {
@@ -384,7 +408,6 @@ class CyberClickerApp(App):
                 }
             }
             self.update_cloud_db(full_db)
-
 
     def force_cloud_save(self):
         self.save_to_cloud_tick(0)
@@ -414,8 +437,7 @@ class CyberClickerApp(App):
             if is_hero:
                 brawler_name = name.replace("ГЕРОЙ: ", "")
                 self.current_brawler = brawler_name
-                if brawler_name not in self.owned_brawlers:
-                    self.owned_brawlers.append(brawler_name)
+                if brawler_name not in self.owned_brawlers: self.owned_brawlers.append(brawler_name)
                 self.income += power
             elif key == "farm":
                 self.passive_income += 5
@@ -427,8 +449,7 @@ class CyberClickerApp(App):
                 if random.random() < 0.35:
                     self.score += 150
                     self.show_popup("ОБЫЧНЫЙ КЕЙС", "Вы выиграли 150 💎!")
-                else:
-                    self.show_popup("ОБЫЧНЫЙ КЕЙС", "Пусто...")
+                else: self.show_popup("ОБЫЧНЫЙ КЕЙС", "Пусто...")
             elif key == "case_epic":
                 rand = random.random()
                 if rand < 0.35:
@@ -443,8 +464,7 @@ class CyberClickerApp(App):
                         self.current_brawler = "Школьник-Читер"
                         self.income += 1
                         self.show_popup("НОВЫЙ БОЕЦ!", "Вы выбили бойца: Школьник-Читер!")
-                else:
-                    self.show_popup("ЭПИЧЕСКИЙ КЕЙС", "Пусто...")
+                else: self.show_popup("ЭПИЧЕСКИЙ КЕЙС", "Пусто...")
             elif key == "case_legendary":
                 rand = random.random()
                 if rand < 0.65:
@@ -454,7 +474,7 @@ class CyberClickerApp(App):
                     self.score += 7500
                     self.show_popup("ЛЕГЕНДАРНЫЙ КЕЙС", "Вы выиграли 7,500 💎!")
                 elif rand < 0.97:
-                    if "Хакер" in self.owned_brawlers:
+                    if "Хакer" in self.owned_brawlers:
                         self.score += 15000
                         self.show_popup("ДУБЛИКАТ!", "Хакер уже есть! Возвращено 15k 💎")
                     else:
@@ -474,8 +494,7 @@ class CyberClickerApp(App):
             
             self.local_save_only()
             self.force_cloud_save()
-            if self.sm.has_screen('shop'):
-                self.sm.get_screen('shop').update_buttons()
+            if self.sm.has_screen('shop'): self.sm.get_screen('shop').update_buttons()
 
     def show_popup(self, title, text):
         box = BoxLayout(orientation='vertical', padding=10)
@@ -486,8 +505,7 @@ class CyberClickerApp(App):
         box.add_widget(btn)
         popup.open()
 
-    def logout(self):
-        self.local_save_only()
+    def logout(self, *args):
         self.nickname = "GUEST"
         self.sm.current = 'auth'
 
