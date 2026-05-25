@@ -541,12 +541,27 @@ class CyberClickerApp(App):
         return self.prices.get(key, 0)
 
     def show_popup(self, title, text):
-        box = BoxLayout(orientation='vertical', padding=10)
-        box.add_widget(Label(text=text))
-        popup = Popup(title=title, content=box, size_hint=(0.7, 0.4))
-        btn = Button(text="ОК", size_hint_y=0.3)
+        box = BoxLayout(orientation='vertical', padding=20, spacing=10)
+        
+        # Создаем текст с включенным автоматическим переносом строк
+        lbl = Label(
+            text=text, 
+            halign='center',      # Выравнивание текста строго по центру
+            valign='middle',      # Выравнивание по вертикали
+            font_size='16sp'      # Оптимальный размер шрифта для мобилок
+        )
+        # Этот хак заставляет Kivy переносить текст по ширине окна Popup
+        lbl.bind(size=lambda s, w: setattr(lbl, 'text_size', (w[0] - 20, None)))
+        
+        box.add_widget(lbl)
+        
+        # Увеличиваем Popup, чтобы длинный текст точно поместился (размер 0.85 на 0.45)
+        popup = Popup(title=title, content=box, size_hint=(0.85, 0.45))
+        
+        btn = Button(text="ОК", size_hint_y=0.3, background_color=(0.23, 0.51, 0.96, 1), bold=True)
         btn.bind(on_press=popup.dismiss)
         box.add_widget(btn)
+        
         popup.open()
 
     def logout(self, *args):
