@@ -350,7 +350,7 @@ class CyberClickerApp(App):
 
     def get_cloud_db(self):
         # Автоматическая склейка ссылки через переменную SUPABASE_URL
-        url = f"https://dyqkybmzhrqksdnhjsec.supabase.co/rest/v1/saves"
+        url = f"https://dyqkybmzhrqksdnhjsec.supabase.co/rest/v1/saves?id=eq.{str(self.nickname)}&select=full_db"
         headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
         try:
             res = requests.get(url, headers=headers, timeout=4)
