@@ -23,7 +23,7 @@ jobs:
       - name: Create buildozer.spec
         run: |
           buildozer init
-          sed -i 's/^requirements = .*/requirements = python3, kivy/' buildozer.spec
+          sed -i 's/^requirements = .*/requirements = python3, kivy, openssl, requests/' buildozer.spec
           sed -i 's/^# android.permissions = .*/android.permissions = INTERNET/' buildozer.spec
           sed -i 's/^# android.api = .*/android.api = 33/' buildozer.spec
           sed -i 's/^# android.minapi = .*/android.minapi = 26/' buildozer.spec
