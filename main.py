@@ -447,44 +447,93 @@ class CyberClickerApp(App):
             self.update_cloud_db(full_db)
 
     def get_cloud_db(self):
-        import json
+        # Мобильный запрос через UrlRequest (телефон его не заблокирует)
+        from kivy.network.urlrequest import UrlRequest
         base_url = "https://" + "dyqkybmzhrqksdnhjsec" + ".supabase.co"
         url = base_url + f"/rest/v1/saves?id=eq.{str(self.nickname)}&select=full_db"
         headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
+        
+        # Запрос улетает в фоне, а ответ обработает функция on_db_success
+        UrlRequest(url, on_success=self.on_db_success, on_failure=self.on_db_error, on_error=self.on_db_error, req_headers=headers)
+
+    def on_db_success(self, req, result):
+        import json
+        full_db = {}
+        if isinstance(result, list) and len(result) > 0:
+            full_db = result[0].get("full_db", {})
+            if isinstance(full_db, str) and full_db.strip():
+                try: full_db = json.loads(full_db)
+                except: pass
+        self.process_mobile_login(full_db)
+
+    def on_db_error(self, req, result):
+        self.process_mobile_login({})
+
+    def cloud_login(self):
+        if SUPABASE_KEY == "ВСТАВЬ_СЮДА_СВОЙ_ДЛИННЫЙ_ANON_PUBLIC_КЛЮЧ":
+            Clock.schedule_once(lambda dt: self.set_auth_info("Укажите SUPABASE_KEY!"), 0)
+            return
+        # На телефоне сначала просто пинаем get_cloud_db, логика продолжится в process_mobile_login
+        self.get_cloud_db()
+
+    def process_mobile_login(self, user_cloud_data):
+        import json
+        if user_cloud_data:
+            saved_pass = user_cloud_data.get("password")
+            save_data = user_cloud_data.get("save_data", {})
+            if not saved_pass and "password" in user_cloud_data:
+                saved_pass = user_cloud_data["password"]
+
+            if saved_pass == self.temp_pass or not saved_pass:
+                if isinstance(save_data, dict):
+                    self.score = int(save_data.get("score", 0))
+                    self.income = int(save_data.get("income", 1))
+                    self.passive_income = int(save_data.get("passive", 0))
+                    self.rebirths = int(save_data.get("rebirths", 0))
+                    self.current_brawler = str(save_data.get("brawler", "Новичок"))
+                    self.owned_brawlers = save_data.get("owned_brawlers", ["Новичок"])
+                    if "prices" in save_data:
+                        self.prices.update(save_data.get("prices", {}))
+                
+                if self.sm.has_screen('main'):
+                    self.sm.get_screen('main').label_score.text = f"{self.score}"
+                try:
+                    with open("autoreg.txt", "w") as f:
+                        f.write(f"{self.nickname}:{self.temp_pass}")
+                except: pass
+                Clock.schedule_once(lambda dt: self.enter_game(), 0)
+                return
+            else:
+                Clock.schedule_once(lambda dt: self.set_auth_info("Неверный пароль!"), 0)
+                return
+
+        new_user_profile = {
+            "password": str(self.temp_pass),
+            "save_data": {
+                "score": int(self.score), "income": int(self.income), "passive": int(self.passive_income),
+                "rebirths": int(self.rebirths), "brawler": str(self.current_brawler), "prices": self.prices,
+                "owned_brawlers": self.owned_brawlers
+            }
+        }
+        self.update_cloud_db(new_user_profile)
         try:
-            res = requests.get(url, headers=headers, timeout=4)
-            if res.status_code == 200:
-                data = res.json()
-                if isinstance(data, list) and len(data) > 0:
-                    row_dict = data[0]
-                    full_db = row_dict.get("full_db", {})
-                    
-                    # ПРИНУДИТЕЛЬНЫЙ ДЕКОДЕР: Если сервер прислал JSON текстом — превращаем в словарь
-                    if isinstance(full_db, str) and full_db.strip():
-                        try:
-                            full_db = json.loads(full_db)
-                        except:
-                            pass
-                            
-                    return full_db
+            with open("autoreg.txt", "w") as f:
+                f.write(f"{self.nickname}:{self.temp_pass}")
         except: pass
-        return {}
+        Clock.schedule_once(lambda dt: self.enter_game(), 0)
 
     def update_cloud_db(self, full_db):
+        from kivy.network.urlrequest import UrlRequest
         import json
-        # Намертво вшиваем твой личный сервер в обход всех ебучих переменных!
         base_url = "https://" + "dyqkybmzhrqksdnhjsec" + ".supabase.co"
         url = base_url + "/rest/v1/saves"
-        
         headers = {
-            "apikey": SUPABASE_KEY, 
-            "Authorization": f"Bearer {SUPABASE_KEY}",
-            "Content-Type": "application/json", 
-            "Prefer": "resolution=merge-duplicates"
+            "apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}",
+            "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates"
         }
-        payload = {"id": str(self.nickname), "full_db": full_db}
-        import threading
-        threading.Thread(target=lambda: requests.post(url, headers=headers, json=payload, timeout=4), daemon=True).start()
+        payload = json.dumps({"id": str(self.nickname), "full_db": full_db})
+        # Безопасная мобильная POST-отправка в фоне
+        UrlRequest(url, req_body=payload, req_headers=headers, method='POST')
 
 
     def force_cloud_save(self):
