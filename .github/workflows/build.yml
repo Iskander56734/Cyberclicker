@@ -20,24 +20,12 @@ jobs:
           pip install --upgrade pip
           pip install Cython==0.29.33 buildozer
 
-      - name: Create and Hard-Configure buildozer.spec
+      - name: Check buildozer.spec
         run: |
-          # 1. Генерируем чистый файл настроек
-          buildozer init
-          
-          # 2. Переименовываем название игры
-          sed -i 's/title = My Application/title = CyberClicker/g' buildozer.spec
-          
-          # 3. Включаем железное разрешение на ИНТЕРНЕТ (убираем комментарий)
-          sed -i 's/#android.permissions = INTERNET/android.permissions = INTERNET/g' buildozer.spec
-          
-          # 4. Принудительно вшиваем нужные библиотеки в requirements для работы Supabase
-          sed -i 's/requirements = python3,kivy/requirements = python3,kivy==2.3.0,requests,urllib3,certifi,idna,charset-normalizer/g' buildozer.spec
-          
-          # 5. Включаем упаковку картинок .png
-          sed -i 's/source.include_exts = py/source.include_exts = py,png,json,txt/g' buildozer.spec
+          # Проверяем, что наш готовый вручную созданный файл на месте
+          ls -la buildozer.spec
 
       - name: Build with Buildozer
         run: |
-          # 6. Принудительно зажимаем кнопку "ДА" для всех лицензий Google
+          # Автоматически жмём "ДА" на все лицензии Google Android
           yes | buildozer android debug
