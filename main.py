@@ -98,13 +98,33 @@ class MainScreen(Screen):
         self.game = App.get_running_app()
         self.main_layout = BoxLayout(orientation='vertical', padding=30, spacing=15)
         
-        # Находим метку счёта алмазов и прописываем шрифт
-        self.label_score = Label(text="0", font_size='60sp', bold=True, color=(0.98, 0.8, 0.08, 1), font_name='emoji.ttf')
-        self.main_layout.add_widget(self.label_score)
+        # --- ФИЧА: Горизонтальный ряд для алмаза и счёта ---
+        # --- ИДЕАЛЬНЫЙ ЦЕНТР ДЛЯ АЛМАЗА И СЧЁТА ---
+        score_layout = BoxLayout(orientation='horizontal', size_hint_y=0.2, spacing=10)
+        
+        # Левая распорка (сдвигает всё вправо к центру)
+        score_layout.add_widget(Label(size_hint_x=0.35))
+        
+        from kivy.uix.image import Image
+        # Твой алмаз (делаем его компактным)
+        diamond_icon = Image(source='diamond.png', size_hint_x=0.1)
+        score_layout.add_widget(diamond_icon)
+        
+        # Цифры счёта (теперь стоят в упор к алмазу)
+        self.label_score = Label(text="0", font_size='50sp', bold=True, color=(0.98, 0.8, 0.08, 1), size_hint_x=0.2, halign='left')
+        self.label_score.bind(size=lambda s, w: setattr(self.label_score, 'text_size', (w[0], None)))
+        score_layout.add_widget(self.label_score)
+        
+        # Правая распорка (сдвигает всё влево к центру)
+        score_layout.add_widget(Label(size_hint_x=0.35))
+        
+        self.main_layout.add_widget(score_layout)
 
-        # Находим метку информации и тоже добавляем шрифт
-        self.label_info = Label(text="", font_size='14sp', color=(0.22, 0.74, 0.97, 1), halign='center', font_name='emoji.ttf')
-        self.main_layout.add_widget(self.label_info)
+                # === ВОЗВРАЩАЕМ КРУТУЮ ШКАЛУ ИЗ ПАЛОЧЕК ===
+
+        # ------------------------------------------
+
+        # --------------------------------------------------
 
         self.label_info = Label(text="", font_size='14sp', color=(0.22, 0.74, 0.97, 1), halign='center')
         self.main_layout.add_widget(self.label_info)
@@ -117,7 +137,8 @@ class MainScreen(Screen):
         self.anim_label = Label(text="", font_size='24sp', bold=True, color=(0.14, 0.77, 0.37, 1), size_hint_y=0.2, opacity=0)
         self.click_area.add_widget(self.anim_label)
         
-        self.btn_click = Button(text="ХАКНУТЬ", size_hint_y=0.8, background_color=(0.23, 0.51, 0.96, 1), font_size='36sp', bold=True, font_name='emoji.ttf')         
+        # У главной кнопки убран font_name, чтобы буквы на ПК не ломались
+        self.btn_click = Button(text="ХАКНУТЬ", size_hint_y=0.8, background_color=(0.23, 0.51, 0.96, 1), font_size='36sp', bold=True)
         self.btn_click.bind(on_press=self.on_click_pressed)
         self.click_area.add_widget(self.btn_click)
         self.main_layout.add_widget(self.click_area)
@@ -152,7 +173,8 @@ class MainScreen(Screen):
         else:
             current_click = format_num(int(self.game.income * (1 + self.game.rebirths * 0.5)))
             
-        self.anim_label.text = f"+{current_click} 💎"
+        # Убираем смайлик из вылетающего текста клика
+        self.anim_label.text = f"+{current_click}"
         self.anim_label.opacity = 1
         anim = Animation(opacity=0, duration=0.4)
         anim.start(self.anim_label)
@@ -160,22 +182,26 @@ class MainScreen(Screen):
 
     def update_ui(self, dt):
         next_cost = self.game.get_rebirth_cost()
-        self.label_score.text = f"💎 {format_num(self.game.score)}"
+        # Теперь тут только число, без текстового значка алмаза
+        self.label_score.text = f"{format_num(self.game.score)}"
         
         if self.game.current_brawler == "Школьник-Читер":
-            click_text = "40% шанс: +150💎 / +0💎"
+            click_text = "50% шанс: +150 / +0"
         elif self.game.current_brawler == "ISKA25k":
-            click_text = "15% шанс: +1000💎 / иначе +500💎"
+            click_text = "15% шанс: +10000 / иначе +5000"
         else:
             click_text = f"x{format_num(int(self.game.income * (1 + self.game.rebirths * 0.5)))} (Бонус: +{self.game.rebirths * 50}%)"
-
-                # Рисуем крутую визуальную шкалу энергии из символов
+            
+        # Из логов убраны смайлики батарейки, чтобы телефон не вис на старте
+        # === ВОЗВРАЩАЕМ КРУТУЮ ШКАЛУ ИЗ ПАЛОЧЕК ===
+        # Высчитываем количество закрашенных палочек (из 10 штук)
         bars = int((self.game.energy / self.game.max_energy) * 10)
         energy_bar = "[" + "|" * bars + " " * (10 - bars) + "]"
         
-        self.label_info.text = f"Хакер: {self.game.nickname} | Перерождения: {self.game.rebirths}\nГерой: {self.game.current_brawler}\nКлик: {click_text} | Пассив: +{format_num(self.game.passive_income)}/сек\nЭНЕРГИЯ: {int(self.game.energy)} / {self.game.max_energy} 🔋"
-        self.label_info.text 
-        self.btn_rebirth.text = f"⚡ СДЕЛАТЬ ПЕРЕРОЖДЕНИЕ ⚡\nЦена: {format_num(next_cost)} 💎 | ...+Новый персонаж"
+        self.label_info.text = f"Хакер: {self.game.nickname} | Перерождения: {self.game.rebirths}\nГерой: {self.game.current_brawler}\nКлик: {click_text} | Пассив: +{format_num(self.game.passive_income)}/сек\nЭНЕРГИЯ: {energy_bar} {int(self.game.energy)} / {self.game.max_energy}"
+        # ==========================================
+
+        self.btn_rebirth.text = f"⚡ СДЕЛАТЬ ПЕРЕРОЖДЕНИЕ ⚡\nЦена: {format_num(next_cost)} | ...+50% к клику"
         
         if self.game.score >= next_cost:
             self.btn_rebirth.opacity = 1
@@ -202,7 +228,7 @@ class ShopScreen(Screen):
         self.shop_data = [
             ("case_normal", "ОБЫЧНЫЙ КЕЙС\n(35% - 150💎 | 65% - 0💎)", 0, False),
             ("case_epic", "ЭПИЧЕСКИЙ КЕЙС\n(35% - 400💎 | 20% - Герой Школьник | 45% - 0💎)", 0, False),
-            ("case_legendary", "ЛЕГЕНДАРНЫЙ КЕЙС\n(65% - 5k💎 | 25% - 7.5k💎 | 7% - Хакер | 3% - ISKA)", 0, False),
+            ("case_legendary", "ЛЕГЕНДАРНЫЙ КЕЙС\n(65% - 5k💎 | 25% - 7.5k💎 | 7% - Хакер | 3% - ISKA25k)", 0, False),
             ("farm", "МАЙНИНГ ФЕРМА (+5/сек)", 0, False),
             ("double", "УДВОИТЕЛЬ КЛИКА (x2)", 0, False),
             ("hero_sl", "ГЕРОЙ: Школьник-Читер", 1, True),
@@ -225,54 +251,111 @@ class ShopScreen(Screen):
     def update_buttons(self):
         for key, btn, name in self.shop_buttons:
             price = self.game.get_price(key)
-            btn.text = f"{name}\nЦена: {format_num(price)} 💎"
+            btn.text = f"{name}\nЦена: {format_num(price)} "
 
 # --- 4. МИРОВОЙ ТОП-10 ---
 class LeaderboardScreen(Screen):
-    def on_enter(self):
-        self.layout.clear_widgets()
-        self.layout.add_widget(Label(text="ЗАГРУЗКА МИРОВОГО ТОПА...", size_hint_y=None, height='50dp'))
-        threading.Thread(target=self.load_top, daemon=True).start()
-
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.game = App.get_running_app()
-        root = BoxLayout(orientation='vertical', padding=20)
-        root.add_widget(Label(text="🏆 МИРОВОЙ ТОП-10", size_hint_y=0.1, font_size='22sp'))
-        self.layout = BoxLayout(orientation='vertical', spacing=10, size_hint_y=None)
-        self.layout.bind(minimum_height=self.layout.setter('height'))
-        scroll = ScrollView()
-        scroll.add_widget(self.layout)
-        root.add_widget(scroll)
-        btn = Button(text="НАЗАД", size_hint_y=0.1)
+        
+        # Главный контейнер на весь экран
+        root = BoxLayout(orientation='vertical', padding=30, spacing=20)
+        
+        # Простой, чёткий заголовок
+        root.add_widget(Label(text="🏆 МИРОВОЙ ТОП-10 🏆", size_hint_y=0.15, font_size='24sp', bold=True))
+        
+        # ТОТ САМЫЙ МОНОЛИТНЫЙ БЛОК. Больше никаких BoxLayout и ScrollView внутри!
+        # Текст будет выводиться единым полотном, Kivy его никак не сожмёт в ноль.
+        self.top_text_label = Label(
+            text="ЗАГРУЗКА МИРОВОГО ТОПА...", 
+            font_size='18sp', 
+            size_hint_y=0.7, 
+            halign='center', 
+            valign='middle'
+        )
+
+        self.top_text_label.text_size = (800, None)
+        root.add_widget(self.top_text_label)
+        
+        # Кнопка возврата назад
+        btn = Button(text="НАЗАД В ИГРУ", size_hint_y=0.15, background_color=(0.12, 0.16, 0.23, 1), bold=True)
         btn.bind(on_press=lambda x: setattr(self.manager, 'current', 'main'))
         root.add_widget(btn)
+        
         self.add_widget(root)
 
-    def load_top(self):
-        full_db = self.game.get_cloud_db()
-        # Возвращаемся в главный поток, чтобы обновить UI Kivy
-        Clock.schedule_once(lambda dt: self.update_top_ui(full_db), 0)
+    def on_enter(self):
+        # Принудительно сохраняем прогресс перед показом топа
+        self.game.force_cloud_save()
+        self.top_text_label.text = "ЗАГРУЗКА МИРОВОГО ТОПА..."
+        threading.Thread(target=self.load_top, daemon=True).start()
 
-    def update_top_ui(self, full_db):
-        self.layout.clear_widgets()
-        users_dict = full_db.get("users", {})
-        mock_data = []
-        for user, saved in users_dict.items():
-            if user != "__system_check__" and isinstance(saved, dict):
-                score_val = saved.get("save_data", {}).get("score", 0)
-                mock_data.append({"name": user, "score": score_val})
+    def load_top(self):
+        # Жестко склеиваем ссылку без пробелов и багов
+        base_url = "https://" + "dyqkybmzhrqksdnhjsec" + ".supabase.co"
+        url = base_url + "/rest/v1/saves?select=id,full_db"
         
-        mock_data = sorted(mock_data, key=lambda x: x['score'], reverse=True)[:10]
+        # Передаем ВСЕ необходимые заголовки для публичного скачивания топа
+        headers = {
+            "apikey": SUPABASE_KEY, 
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+            "Range": "0-9" # Скачиваем строго первые 10 строк, чтобы Kivy не лагал!
+        }
+        try:
+            res = requests.get(url, headers=headers, timeout=4)
+            if res.status_code == 200 and res.text.strip():
+                Clock.schedule_once(lambda dt: self.update_top_ui(res.json()), 0)
+                return
+        except: pass
+        Clock.schedule_once(lambda dt: self.update_top_ui([]), 0)
+
+
+    def update_top_ui(self, all_rows):
+        import json
+        mock_data = []
+
+        if isinstance(all_rows, dict):
+            all_rows = [all_rows]
+
+        if isinstance(all_rows, list) and all_rows:
+            for row in all_rows:
+                if not isinstance(row, dict): continue
+                user_name = row.get("id")
+                full_db = row.get("full_db", {})
+
+                # Десериализуем строку из Supabase в словарь Python
+                if isinstance(full_db, str) and full_db.strip():
+                    try: 
+                        full_db = json.loads(full_db)
+                    except: 
+                        full_db = {}
+
+                if user_name:
+                    score_val = 0
+                    if isinstance(full_db, dict) and full_db:
+                        s_data = full_db.get("save_data", {})
+                        if isinstance(s_data, dict):
+                            score_val = s_data.get("score", 0)
+                        else:
+                            score_val = full_db.get("score", 0)
+
+                    # Копируем строго то число, которое лежит в базе данных сервера!
+                    mock_data.append({"name": str(user_name), "score": int(score_val)})
+
+        # Если в базе реально шаром покати, пишем честный текст без фейковых начислений
         if not mock_data:
-            self.layout.add_widget(Label(text="Топ пуст", size_hint_y=None, height='40dp'))
+            self.top_text_label.text = "В таблице лидеров пока пусто...\n\nНакликай 10 алмазов!"
             return
 
+        # Сортируем топ строго по честным рекордам из облака
+        mock_data = sorted(mock_data, key=lambda x: x['score'], reverse=True)[:10]
+
+        lines = []
         for i, user in enumerate(mock_data, 1):
-            self.layout.add_widget(Label(
-                text=f"{i}. {user['name']} — {format_num(user['score'])} 💎",
-                size_hint_y=None, height='40dp', font_size='16sp'
-            ))
+            lines.append(f"{i}. {user['name']}  ---  {format_num(user['score'])} 💎")
+
+        self.top_text_label.text = "\n".join(lines)
 
 # --- 5. ЛОГИКА ПРИЛОЖЕНИЯ И ОБЛАКА ---
 class CyberClickerApp(App):
@@ -293,7 +376,7 @@ class CyberClickerApp(App):
         self.owned_brawlers = ["Новичок"]
         self.prices = {
             "case_normal": 100, "case_epic": 1000, "case_legendary": 10000,
-            "farm": 150, "double": 200, "hero_sl": 5000, "hero_hacker": 15000, "hero_iska": 25000
+            "farm": 150, "double": 200, "hero_sl": 25000, "hero_hacker": 50000, "hero_iska": 100000
         }
         self.sm = ScreenManager()
         self.sm.add_widget(RegistrationScreen(name='auth'))
@@ -303,6 +386,19 @@ class CyberClickerApp(App):
         Clock.schedule_interval(self.add_passive, 1.0)
         Clock.schedule_interval(self.save_to_cloud_tick, 30.0)
         return self.sm
+
+        # Автоматический вход при запуске
+        import os
+        if os.path.exists("autoreg.txt"):
+            try:
+                with open("autoreg.txt", "r") as f:
+                    saved_nick, saved_pass = f.read().split(":")
+                self.nickname = saved_nick
+                self.temp_pass = saved_pass
+                # Запускаем фоновую авторизацию в Supabase
+                threading.Thread(target=self.cloud_login, daemon=True).start()
+            except: pass
+
 
 
     def set_auth_info(self, text):
@@ -321,10 +417,10 @@ class CyberClickerApp(App):
             self.local_save_only()
 
     def local_save_only(self):
-        if self.nickname != "GUEST" and self.sm.current != 'auth':
-            local_db = load_local_db()
-            if "users" not in local_db: local_db["users"] = {}
-            local_db["users"][self.nickname] = {
+        # Локальный бэкап на устройстве
+        try:
+            import json
+            current_user_data = {
                 "password": self.temp_pass,
                 "save_data": {
                     "score": self.score, "income": self.income, "passive": self.passive_income,
@@ -332,7 +428,9 @@ class CyberClickerApp(App):
                     "owned_brawlers": self.owned_brawlers
                 }
             }
-            save_local_db(local_db)
+            with open("local_save.json", "w", encoding="utf-8") as f:
+                json.dump(current_user_data, f, ensure_ascii=False, indent=4)
+        except: pass
 
     def save_to_cloud_tick(self, dt):
         if self.nickname != "GUEST" and self.sm.current != 'auth':
@@ -349,70 +447,63 @@ class CyberClickerApp(App):
             self.update_cloud_db(full_db)
 
     def get_cloud_db(self):
-        # Автоматическая склейка ссылки через переменную SUPABASE_URL
-        url = f"https://dyqkybmzhrqksdnhjsec.supabase.co/rest/v1/saves?id=eq.{str(self.nickname)}&select=full_db"
+        import json
+        base_url = "https://" + "dyqkybmzhrqksdnhjsec" + ".supabase.co"
+        url = base_url + f"/rest/v1/saves?id=eq.{str(self.nickname)}&select=full_db"
         headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
         try:
             res = requests.get(url, headers=headers, timeout=4)
             if res.status_code == 200:
                 data = res.json()
                 if isinstance(data, list) and len(data) > 0:
-                    # ИСПРАВЛЕНИЕ: Берем первый элемент из списка строк базы по индексу 0
-                    return data[0].get("full_db", {})
+                    row_dict = data[0]
+                    full_db = row_dict.get("full_db", {})
+                    
+                    # ПРИНУДИТЕЛЬНЫЙ ДЕКОДЕР: Если сервер прислал JSON текстом — превращаем в словарь
+                    if isinstance(full_db, str) and full_db.strip():
+                        try:
+                            full_db = json.loads(full_db)
+                        except:
+                            pass
+                            
+                    return full_db
         except: pass
         return {}
 
     def update_cloud_db(self, full_db):
-        url = f"https://dyqkybmzhrqksdnhjsec.supabase.co/rest/v1/saves"
-        headers = {
-            "apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}",
-            "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates"
-        }
-        payload = {"id": self.nickname, "full_db": full_db}
-        threading.Thread(target=lambda: requests.post(url, headers=headers, json=payload, timeout=4), daemon=True).start()
-
-    def cloud_login(self):
-        if SUPABASE_KEY == "ВСТАВЬ_СЮДА_СВОЙ_ДЛИННЫЙ_ANON_PUBLIC_КЛЮЧ":
-            Clock.schedule_once(lambda dt: self.set_auth_info("Укажите SUPABASE_KEY!"), 0)
-            return
-
-        user_cloud_data = self.get_cloud_db()
+        import json
+        # Намертво вшиваем твой личный сервер в обход всех ебучих переменных!
+        base_url = "https://" + "dyqkybmzhrqksdnhjsec" + ".supabase.co"
+        url = base_url + "/rest/v1/saves"
         
-        if user_cloud_data and "password" in user_cloud_data:
-            saved_pass = user_cloud_data.get("password")
-            if saved_pass == self.temp_pass:
-                save_data = user_cloud_data.get("save_data", {})
-                self.score = save_data.get("score", 0)
-                self.income = save_data.get("income", 1)
-                self.passive_income = save_data.get("passive", 0)
-                self.rebirths = save_data.get("rebirths", 0)
-                self.current_brawler = save_data.get("brawler", "Новичок")
-                self.owned_brawlers = save_data.get("owned_brawlers", ["Новичок"])
-                self.prices.update(save_data.get("prices", {}))
-                Clock.schedule_once(lambda dt: self.enter_game(), 0)
-            else:
-                Clock.schedule_once(lambda dt: self.set_auth_info("Неверный пароль!"), 0)
-        else:
-            new_user_profile = {
-                "password": self.temp_pass,
-                "save_data": {
-                    "score": self.score, "income": self.income, "passive": self.passive_income,
-                    "rebirths": self.rebirths, "brawler": self.current_brawler, "prices": self.prices,
-                    "owned_brawlers": self.owned_brawlers
-                }
-            }
-            self.update_cloud_db(new_user_profile)
-            
-            local_db = load_local_db()
-            if "users" not in local_db: local_db["users"] = {}
-            local_db["users"][self.nickname] = new_user_profile
-            save_local_db(local_db)
-            
-            Clock.schedule_once(lambda dt: self.enter_game(), 0)
+        headers = {
+            "apikey": SUPABASE_KEY, 
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+            "Content-Type": "application/json", 
+            "Prefer": "resolution=merge-duplicates"
+        }
+        payload = {"id": str(self.nickname), "full_db": full_db}
+        import threading
+        threading.Thread(target=lambda: requests.post(url, headers=headers, json=payload, timeout=4), daemon=True).start()
 
 
     def force_cloud_save(self):
-        self.save_to_cloud_tick(0)
+        # Жестко собираем структуру прямо перед отправкой
+        import json
+        user_data = {
+            "password": str(self.temp_pass),
+            "save_data": {
+                "score": int(self.score),
+                "income": int(self.income),
+                "passive": int(self.passive_income),
+                "rebirths": int(self.rebirths),
+                "brawler": str(self.current_brawler),
+                "prices": self.prices,
+                "owned_brawlers": self.owned_brawlers
+            }
+        }
+        # Пуляем напрямую в update
+        self.update_cloud_db(user_data)
 
     def get_rebirth_cost(self):
         # Если перерождений 0, то цена для 1-го перерождения
@@ -428,26 +519,67 @@ class CyberClickerApp(App):
         else:
             return (self.rebirths + 1) * 50000000
 
+    def cloud_login(self):
+        if SUPABASE_KEY == "ВСТАВЬ_СЮДА_СВОЙ_ДЛИННЫЙ_ANON_PUBLIC_КЛЮЧ":
+            Clock.schedule_once(lambda dt: self.set_auth_info("Укажите SUPABASE_KEY!"), 0)
+            return
 
-    def do_rebirth(self):
-        cost = self.get_rebirth_cost()
-        if self.score >= cost:
-            self.score = 0
-            self.income = 1
-            self.passive_income = 0
-            self.current_brawler = "Новичок"
-            self.owned_brawlers = ["Новичок"]
-            self.rebirths += 1
+        # Скачиваем и парсим чистый словарь full_db
+        user_cloud_data = self.get_cloud_db()
+        
+        if user_cloud_data:
+            saved_pass = user_cloud_data.get("password")
+            save_data = user_cloud_data.get("save_data", {})
             
-            # ФИЧА №1: Полный сброс цен в магазине до начальных при перерождении
-            self.prices = {
-                "case_normal": 100, "case_epic": 1000, "case_legendary": 10000,
-                "farm": 150, "double": 200, "hero_sl": 5000, "hero_hacker": 15000, "hero_iska": 25000       
+            if not saved_pass and "password" in user_cloud_data:
+                saved_pass = user_cloud_data["password"]
+
+            if saved_pass == self.temp_pass or not saved_pass:
+                # НАМЕРТВО ЗАЛИВАЕМ АЛМАЗЫ В ОПЕРАТИВНУЮ ПАМЯТЬ
+                if isinstance(save_data, dict):
+                    self.score = int(save_data.get("score", 0))
+                    self.income = int(save_data.get("income", 1))
+                    self.passive_income = int(save_data.get("passive", 0))
+                    self.rebirths = int(save_data.get("rebirths", 0))
+                    self.current_brawler = str(save_data.get("brawler", "Новичок"))
+                    self.owned_brawlers = save_data.get("owned_brawlers", ["Новичок"])
+                    if "prices" in save_data:
+                        self.prices.update(save_data.get("prices", {}))
+                
+                # ЖЁСТКИЙ ХАК: Впечатываем баланс в текст главного экрана ДО перехода, чтобы Kivy не обнулился!
+                if self.sm.has_screen('main'):
+                    self.sm.get_screen('main').label_score.text = f"{self.score}"
+                
+                # Безопасно пишем файл автовхода
+                try:
+                    with open("autoreg.txt", "w") as f:
+                        f.write(f"{self.nickname}:{self.temp_pass}")
+                except: pass
+                    
+                Clock.schedule_once(lambda dt: self.enter_game(), 0)
+                return
+            else:
+                Clock.schedule_once(lambda dt: self.set_auth_info("Неверный пароль!"), 0)
+                return
+
+        # Если игрока нет на сервере — создаем ему чистую структуру jsonb
+        new_user_profile = {
+            "password": str(self.temp_pass),
+            "save_data": {
+                "score": int(self.score), "income": int(self.income), "passive": int(self.passive_income),
+                "rebirths": int(self.rebirths), "brawler": str(self.current_brawler), "prices": self.prices,
+                "owned_brawlers": self.owned_brawlers
             }
+        }
+        self.update_cloud_db(new_user_profile)
+        
+        try:
+            with open("autoreg.txt", "w") as f:
+                f.write(f"{self.nickname}:{self.temp_pass}")
+        except: pass
             
-            self.local_save_only()
-            self.force_cloud_save()
-
+        Clock.schedule_once(lambda dt: self.enter_game(), 0)
+        
     def buy(self, key, name, power, is_hero):
         # ФИЧА №2: Блокировка покупки персонажей по перерождениям
         if key == "hero_hacker" and self.rebirths < 2:
@@ -486,7 +618,7 @@ class CyberClickerApp(App):
                 elif rand < 0.55:
                     if "Школьник-Читер" in self.owned_brawlers:
                         self.score += 5000
-                        self.show_popup("ДУБЛИКАТ!", "Школьник-Читер уже есть! Возвращено 5k 💎")
+                        self.show_popup("ДУБЛИКАТ!", "Школьник-Читер уже есть! Возвращено 25k 💎")
                     else:
                         self.owned_brawlers.append("Школьник-Читер")
                         self.current_brawler = "Школьник-Читер"
@@ -504,7 +636,7 @@ class CyberClickerApp(App):
                 elif rand < 0.97:
                     if "Хакер" in self.owned_brawlers:
                         self.score += 15000
-                        self.show_popup("ДУБЛИКАТ!", "Хакер уже есть! Возвращено 15k 💎")
+                        self.show_popup("ДУБЛИКАТ!", "Хакер уже есть! Возвращено 50k 💎")
                     else:
                         self.owned_brawlers.append("Хакер")
                         self.current_brawler = "Хакер"
@@ -513,7 +645,7 @@ class CyberClickerApp(App):
                 else:
                     if "ISKA25k" in self.owned_brawlers:
                         self.score += 25000
-                        self.show_popup("ДУБЛИКАТ!", "ISKA25k уже есть! Возвращено 25k 💎")
+                        self.show_popup("ДУБЛИКАТ!", "ISKA25k уже есть! Возвращено 100k 💎")
                     else:
                         self.owned_brawlers.append("ISKA25k")
                         self.current_brawler = "ISKA25k"
@@ -525,31 +657,33 @@ class CyberClickerApp(App):
             if self.sm.has_screen('shop'): self.sm.get_screen('shop').update_buttons()
 
     def click(self):
-        # 1. Если энергия закончилась — блокируем клик
+        # (Тут твоя проверка энергии)
         if self.energy < 1:
             if self.sm.has_screen('main'):
-                self.sm.get_screen('main').btn_click.text = "НЕТ ЭНЕРГИИ! 🔋"
+                self.sm.get_screen('main').btn_click.text = "НЕТ ЭНЕРГИИ!"
                 Clock.schedule_once(lambda dt: setattr(self.sm.get_screen('main').btn_click, 'text', "ХАКНУТЬ"), 0.5)
             return
-        
+
         self.energy -= 1
 
-        # --- Дальше идет твоя обычная логика начисления алмазов ---
+        # ИСПРАВЛЕННАЯ ЛОГИКА КЛИКА С УЧЕТОМ ПЕРЕРОЖДЕНИЙ ДЛЯ ВСЕХ ГЕРОЕВ
+        bonus_multiplier = 1 + (self.rebirths * 0.5) # Твои +50% за каждое перерождение
+
         if self.current_brawler == "Школьник-Читер":
-            gained = 150 if random.random() < 0.40 else 0
+            gained = int(150 * bonus_multiplier) if random.random() < 0.40 else 0
             self.score += gained
         elif self.current_brawler == "ISKA25k":
-            gained = 10000 if random.random() < 0.15 else 500
+            gained = int(10000 * bonus_multiplier) if random.random() < 0.15 else int(5000 * bonus_multiplier)
             self.score += gained
         else:
-            self.score += int(self.income * (1 + self.rebirths * 0.5))
+            # Обычный клик теперь ЖЕЛЕЗНО умножается на бонус перерождений!
+            self.score += int(self.income * bonus_multiplier)
         
         self.local_save_only()
         self.click_count += 1
         if self.click_count >= 10:
             self.click_count = 0
             self.save_to_cloud_tick(0)
-
 
     def get_price(self, key):
         return self.prices.get(key, 0)
