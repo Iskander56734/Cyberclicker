@@ -99,26 +99,27 @@ class MainScreen(Screen):
         self.main_layout = BoxLayout(orientation='vertical', padding=30, spacing=15)
         
         # --- ФИЧА: Горизонтальный ряд для алмаза и счёта ---
-        # --- ИДЕАЛЬНЫЙ ЦЕНТР ДЛЯ АЛМАЗА И СЧЁТА ---
-        score_layout = BoxLayout(orientation='horizontal', size_hint_y=0.2, spacing=10)
+        # --- МОБИЛЬНЫЙ ЦЕНТР ДЛЯ АЛМАЗА И СЧЁТА ---
+        score_layout = BoxLayout(orientation='horizontal', size_hint_y=0.15, spacing=5)
         
-        # Левая распорка (сдвигает всё вправо к центру)
-        score_layout.add_widget(Label(size_hint_x=0.35))
+        # Левая распорка (сжимает к центру)
+        score_layout.add_widget(Label(size_hint_x=0.3))
         
         from kivy.uix.image import Image
-        # Твой алмаз (делаем его компактным)
-        diamond_icon = Image(source='diamond.png', size_hint_x=0.1)
+        # Твой компактный алмазик
+        diamond_icon = Image(source='diamond.png', size_hint_x=0.15, allow_stretch=True)
         score_layout.add_widget(diamond_icon)
         
-        # Цифры счёта (теперь стоят в упор к алмазу)
-        self.label_score = Label(text="0", font_size='50sp', bold=True, color=(0.98, 0.8, 0.08, 1), size_hint_x=0.2, halign='left')
-        self.label_score.bind(size=lambda s, w: setattr(self.label_score, 'text_size', (w[0], None)))
+        # Текст счёта (убираем text_size, чтобы цифры не прыгали на новую строку!)
+        self.label_score = Label(text="0", font_size='40sp', bold=True, color=(0.98, 0.8, 0.08, 1), size_hint_x=0.25, halign='left', valign='middle')
         score_layout.add_widget(self.label_score)
         
-        # Правая распорка (сдвигает всё влево к центру)
-        score_layout.add_widget(Label(size_hint_x=0.35))
+        # Правая распорка (сжимает к центру)
+        score_layout.add_widget(Label(size_hint_x=0.3))
         
         self.main_layout.add_widget(score_layout)
+        # ------------------------------------------
+
 
                 # === ВОЗВРАЩАЕМ КРУТУЮ ШКАЛУ ИЗ ПАЛОЧЕК ===
 
