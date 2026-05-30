@@ -20,9 +20,9 @@ jobs:
           pip install --upgrade pip
           pip install Cython==0.29.33 buildozer
 
-      - name: Create and Hard-Configure buildozer.spec
+      - name: Build with Buildozer
         run: |
-          buildozer init
+          buildozer android debug
           
           # 1. Задаем красивое название игры на экране телефона
           sed -i 's/^title = .*/title = Cyber Clicker/' buildozer.spec
