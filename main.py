@@ -65,31 +65,61 @@ def save_local_db(db):
 class RegistrationScreen(Screen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        layout = BoxLayout(orientation='vertical', padding=50, spacing=15)
-        layout.add_widget(Label(text="CYBER LOGIN", font_size='32sp', bold=True, color=(0.22, 0.74, 0.97, 1)))
-        self.nick_input = TextInput(multiline=False, hint_text="Никнейм...", height='50dp', size_hint_y=None)
-        self.pass_input = TextInput(multiline=False, hint_text="Пароль...", password=True, height='50dp', size_hint_y=None)
-        layout.add_widget(self.nick_input)
-        layout.add_widget(self.pass_input)
-        self.info_label = Label(text="Введите данные для входа", font_size='14sp', color=(1, 1, 1, 0.6))
-        layout.add_widget(self.info_label)
-        btn = Button(text="ВОЙТИ / РЕГИСТРАЦИЯ", size_hint_y=None, height='70dp', background_color=(0.14, 0.77, 0.37, 1), bold=True)
-        btn.bind(on_press=self.try_login)
-        layout.add_widget(btn)
-        layout.add_widget(Label())
+        self.game = App.get_running_app()
+        layout = BoxLayout(orientation='vertical', padding=40, spacing=20)
+        
+        layout.add_widget(Label(text="⚙️ КИБЕР-ВХОД ⚙️", font_size='28sp', bold=True, size_hint_y=0.15))
+        
+        # Поле ввода НИКНЕЙМА
+        self.input_nick = TextInput(text="", hint_text="Твой Хакер-Ник", multiline=False, size_hint_y=0.12, font_size='18sp')
+        layout.add_widget(self.input_nick)
+        
+        # Поле ввода ПАРОЛЯ
+        self.input_pass = TextInput(text="", hint_text="Пароль", password=True, multiline=False, size_hint_y=0.12, font_size='18sp')
+        layout.add_widget(self.input_pass)
+        
+        self.label_info = Label(text="Введите данные для входа в сеть", color=(0.7, 0.7, 0.7, 1), size_hint_y=0.1)
+        layout.add_widget(self.label_info)
+        
+        # Большая кнопка ВХОД
+        btn_login = Button(text="ПОДКЛЮЧИТЬСЯ", background_color=(0.23, 0.51, 0.96, 1), font_size='22sp', bold=True, size_hint_y=0.18)
+        btn_login.bind(on_press=self.start_login)
+        layout.add_widget(btn_login)
+        
+        layout.add_widget(Label(size_hint_y=0.21)) # Распорка
         self.add_widget(layout)
 
-    def try_login(self, instance):
-        nick = self.nick_input.text.strip()
-        pw = self.pass_input.text.strip()
-        if len(nick) < 2 or len(pw) < 2:
-            self.info_label.text = "Слишком короткие данные!"
+    def on_enter(self):
+        # БРОНЕБОЙНОЕ ЗАПОМИНАНИЕ: При открытии экрана сами вставляем прошлый ник и пароль!
+        import os
+        data_dir = self.game.user_data_dir
+        file_path = os.path.join(data_dir, "autoreg.txt")
+        if os.path.exists(file_path):
+            try:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    saved_nick, saved_pass = f.read().split(":")
+                # Сами пишем буквы в поля ввода!
+                self.input_nick.text = str(saved_nick)
+                self.input_pass.text = str(saved_pass)
+                self.label_info.text = "Данные успешно востановлены! Жми кнопку!"
+            except: pass
+
+    def start_login(self, instance):
+        # Считываем то, что вписано в поля (или восстановилось само)
+        nick = self.input_nick.text.strip()
+        password = self.input_pass.text.strip()
+        
+        if not nick or not password:
+            self.label_info.text = "Заполни все поля, хакер!"
             return
-        app = App.get_running_app()
-        app.nickname = nick
-        app.temp_pass = hashlib.sha256(pw.encode()).hexdigest()
-        self.info_label.text = "Связь с сервером..."
-        threading.Thread(target=app.cloud_login, daemon=True).start()
+            
+        self.label_info.text = "Связь со спутником..."
+        self.game.nickname = nick
+        self.game.temp_pass = password
+        
+        # Пускаем поток авторизации в Supabase
+        import threading
+        threading.Thread(target=self.game.cloud_login, daemon=True).start()
 
 # --- 2. ГЛАВНЫЙ ЭКРАН ---
 class MainScreen(Screen):
