@@ -22,7 +22,12 @@ jobs:
 
       - name: Build with Buildozer
         run: |
+          # Автоматически принимаем все ебучие лицензии Google Android SDK
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          
+          # Запускаем чистую сборку нашего APK
           buildozer android debug
+
           
           # 1. Задаем красивое название игры на экране телефона
           sed -i 's/^title = .*/title = Cyber Clicker/' buildozer.spec
