@@ -292,24 +292,20 @@ class LeaderboardScreen(Screen):
         threading.Thread(target=self.load_top, daemon=True).start()
 
     def load_top(self):
-        # Жестко склеиваем ссылку без пробелов и багов
+        from kivy.network.urlrequest import UrlRequest
         base_url = "https://" + "dyqkybmzhrqksdnhjsec" + ".supabase.co"
         url = base_url + "/rest/v1/saves?select=id,full_db"
-        
-        # Передаем ВСЕ необходимые заголовки для публичного скачивания топа
         headers = {
-            "apikey": SUPABASE_KEY, 
-            "Authorization": f"Bearer {SUPABASE_KEY}",
-            "Range": "0-9" # Скачиваем строго первые 10 строк, чтобы Kivy не лагал!
+            "apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}",
+            "Range": "0-9"
         }
-        try:
-            res = requests.get(url, headers=headers, timeout=4)
-            if res.status_code == 200 and res.text.strip():
-                Clock.schedule_once(lambda dt: self.update_top_ui(res.json()), 0)
-                return
-        except: pass
-        Clock.schedule_once(lambda dt: self.update_top_ui([]), 0)
+        UrlRequest(url, on_success=self.on_top_success, on_failure=self.on_top_error, on_error=self.on_top_error, req_headers=headers)
 
+    def on_top_success(self, req, result):
+        Clock.schedule_once(lambda dt: self.update_top_ui(result), 0)
+
+    def on_top_error(self, req, result):
+        Clock.schedule_once(lambda dt: self.update_top_ui([]), 0)
 
     def update_top_ui(self, all_rows):
         import json
