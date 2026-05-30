@@ -16,44 +16,28 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential libsqlite3-dev sqlite3 bzip2 libbz2-dev zlib1g-dev libssl-dev openssl libgdbm-dev libgdbm-compat-dev liblzma-dev libreadline-dev libncursesw5-dev libffi-dev uuid-dev git ninja-build patchelf
+          sudo apt-get install -y build-essential libsqlite3-dev sqlite3 bzip2 libbz2-dev libffi-dev xz-utils libssl-dev openssl libgdbm-dev libgdbm-compat-dev libreadline-dev libncursesw5-dev libtinfo-dev libgomp1
           pip install --upgrade pip
           pip install Cython==0.29.33 buildozer
 
-      - name: Build with Buildozer
+      - name: Create and Hard-Configure buildozer.spec
         run: |
-          # ЖЕСТКИЙ ХАК: заставляем сам Buildozer автоматически сожрать все лицензии Google Android SDK
-          buildozer android licenses
+          # 1. Генерируем чистый файл настроек
+          buildozer init
           
-          # Запускаем финальную сборку нашей мобильной игры
-          buildozer android debug
-
+          # 2. Переименовываем название игры
+          sed -i 's/title = My Application/title = CyberClicker/g' buildozer.spec
           
-          # 1. Задаем красивое название игры на экране телефона
-          sed -i 's/^title = .*/title = Cyber Clicker/' buildozer.spec
+          # 3. Включаем железное разрешение на ИНТЕРНЕТ (убираем комментарий)
+          sed -i 's/#android.permissions = INTERNET/android.permissions = INTERNET/g' buildozer.spec
           
-          # 2. Прописываем kivy и openssl для корректной работы HTTPS-сети на Android
-          sed -i 's/^requirements = .*/requirements = python3, kivy, openssl/' buildozer.spec
+          # 4. Принудительно вшиваем нужные библиотеки в requirements для работы Supabase
+          sed -i 's/requirements = python3,kivy/requirements = python3,kivy==2.3.0,requests,urllib3,certifi,idna,charset-normalizer/g' buildozer.spec
           
-          # 3. Жестко включаем разрешение на ИНТЕРНЕТ (убираем комментарий независимо от пробелов)
-          sed -i 's/^#\s*android.permissions = .*/android.permissions = INTERNET/' buildozer.spec
-          sed -i 's/^#android.permissions = .*/android.permissions = INTERNET/' buildozer.spec
-          
-          # 4. Настраиваем стабильные версии Android API для современных устройств
-          sed -i 's/^#\s*android.api = .*/android.api = 33/' buildozer.spec
-          sed -i 's/^#\s*android.minapi = .*/android.minapi = 26/' buildozer.spec
-          sed -i 's/^#\s*android.ndk = .*/android.ndk = 25b/' buildozer.spec
-          
-          # 5. Подключаем твою картинку icon.png в качестве иконки APK
-          sed -i 's/^#\s*icon.filename = .*/icon.filename = %(source.dir)s\/icon.png/' buildozer.spec
-          sed -i 's/^#icon.filename = .*/icon.filename = %(source.dir)s\/icon.png/' buildozer.spec
+          # 5. Включаем упаковку картинок .png
+          sed -i 's/source.include_exts = py/source.include_exts = py,png,json,txt/g' buildozer.spec
 
       - name: Build with Buildozer
         run: |
-          yes | buildozer -v android debug
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: CyberClicker-APK
-          path: bin/*.apk
+          # 6. Принудительно зажимаем кнопку "ДА" для всех лицензий Google
+          yes | buildozer android debug
