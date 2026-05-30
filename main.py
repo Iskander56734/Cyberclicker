@@ -70,42 +70,41 @@ class RegistrationScreen(Screen):
         
         layout.add_widget(Label(text="⚙️ КИБЕР-ВХОД ⚙️", font_size='28sp', bold=True, size_hint_y=0.15))
         
-        # Поле ввода НИКНЕЙМА
         self.input_nick = TextInput(text="", hint_text="Твой Хакер-Ник", multiline=False, size_hint_y=0.12, font_size='18sp')
         layout.add_widget(self.input_nick)
         
-        # Поле ввода ПАРОЛЯ
         self.input_pass = TextInput(text="", hint_text="Пароль", password=True, multiline=False, size_hint_y=0.12, font_size='18sp')
         layout.add_widget(self.input_pass)
         
         self.label_info = Label(text="Введите данные для входа в сеть", color=(0.7, 0.7, 0.7, 1), size_hint_y=0.1)
         layout.add_widget(self.label_info)
         
-        # Большая кнопка ВХОД
         btn_login = Button(text="ПОДКЛЮЧИТЬСЯ", background_color=(0.23, 0.51, 0.96, 1), font_size='22sp', bold=True, size_hint_y=0.18)
         btn_login.bind(on_press=self.start_login)
         layout.add_widget(btn_login)
         
-        layout.add_widget(Label(size_hint_y=0.21)) # Распорка
+        layout.add_widget(Label(size_hint_y=0.21))
         self.add_widget(layout)
 
+    # === МЕТОД ДОЛЖЕН СТОЯТЬ СТРОГО ТУТ! ===
     def on_enter(self):
-        # БРОНЕБОЙНОЕ ЗАПОМИНАНИЕ: При открытии экрана сами вставляем прошлый ник и пароль!
         import os
         data_dir = self.game.user_data_dir
         file_path = os.path.join(data_dir, "autoreg.txt")
+        print(f"[ТЕСТ] Ищем файл авто-входа по пути: {file_path}")
+        
         if os.path.exists(file_path):
             try:
                 with open(file_path, "r", encoding="utf-8") as f:
                     saved_nick, saved_pass = f.read().split(":")
-                # Сами пишем буквы в поля ввода!
                 self.input_nick.text = str(saved_nick)
                 self.input_pass.text = str(saved_pass)
-                self.label_info.text = "Данные успешно востановлены! Жми кнопку!"
-            except: pass
+                self.label_info.text = "Данные востановлены! Нажми подключиться!"
+                print(f"[УСПЕХ] Данные подтянулись в поля: {saved_nick}")
+            except Exception as e: 
+                print(f"[ОШИБКА ЧТЕНИЯ]: {e}")
 
     def start_login(self, instance):
-        # Считываем то, что вписано в поля (или восстановилось само)
         nick = self.input_nick.text.strip()
         password = self.input_pass.text.strip()
         
@@ -117,7 +116,7 @@ class RegistrationScreen(Screen):
         self.game.nickname = nick
         self.game.temp_pass = password
         
-        # Пускаем поток авторизации в Supabase
+        # === ВОТ ЭТА СТРОЧКА ДОЛЖНА СТОЯТЬ ТУТ ЖЕЛЕЗНО! ===
         import threading
         threading.Thread(target=self.game.cloud_login, daemon=True).start()
 
@@ -316,11 +315,6 @@ class LeaderboardScreen(Screen):
         
         self.add_widget(root)
 
-    def on_enter(self):
-        # Принудительно сохраняем прогресс перед показом топа
-        self.game.force_cloud_save()
-        self.top_text_label.text = "ЗАГРУЗКА МИРОВОГО ТОПА..."
-        threading.Thread(target=self.load_top, daemon=True).start()
 
     def load_top(self):
         from kivy.network.urlrequest import UrlRequest
@@ -414,22 +408,11 @@ class CyberClickerApp(App):
         Clock.schedule_interval(self.save_to_cloud_tick, 30.0)
         return self.sm
 
-        # Автоматический вход при запуске
-        import os
-        if os.path.exists("autoreg.txt"):
-            try:
-                with open("autoreg.txt", "r") as f:
-                    saved_nick, saved_pass = f.read().split(":")
-                self.nickname = saved_nick
-                self.temp_pass = saved_pass
-                # Запускаем фоновую авторизацию в Supabase
-                threading.Thread(target=self.cloud_login, daemon=True).start()
-            except: pass
-
-
-
     def set_auth_info(self, text):
-        self.sm.get_screen('auth').info_label.text = text
+        try:
+            self.sm.get_screen('auth').label_info.text = str(text)
+        except: pass
+
 
     def enter_game(self):
         self.sm.current = 'main'
@@ -600,7 +583,6 @@ class CyberClickerApp(App):
             Clock.schedule_once(lambda dt: self.set_auth_info("Укажите SUPABASE_KEY!"), 0)
             return
 
-        # Скачиваем и парсим чистый словарь full_db
         user_cloud_data = self.get_cloud_db()
         
         if user_cloud_data:
@@ -611,7 +593,17 @@ class CyberClickerApp(App):
                 saved_pass = user_cloud_data["password"]
 
             if saved_pass == self.temp_pass or not saved_pass:
-                # НАМЕРТВО ЗАЛИВАЕМ АЛМАЗЫ В ОПЕРАТИВНУЮ ПАМЯТЬ
+                # ЗАПИСЫВАЕМ ФАЙЛ ТОЛЬКО ЗДЕСЬ — КОГДА СЕРВЕР ПОДТВЕРДИЛ ВХОД!
+                try:
+                    import os
+                    data_dir = self.user_data_dir
+                    file_path = os.path.join(data_dir, "autoreg.txt")
+                    with open(file_path, "w", encoding="utf-8") as f:
+                        f.write(f"{str(self.nickname)}:{str(self.temp_pass)}")
+                    print(f"[УСПЕХ] Файл авто-входа записан: {self.nickname}")
+                except Exception as e: 
+                    print(f"[ОШИБКА ЗАПИСИ]: {e}")
+
                 if isinstance(save_data, dict):
                     self.score = int(save_data.get("score", 0))
                     self.income = int(save_data.get("income", 1))
@@ -622,15 +614,8 @@ class CyberClickerApp(App):
                     if "prices" in save_data:
                         self.prices.update(save_data.get("prices", {}))
                 
-                # ЖЁСТКИЙ ХАК: Впечатываем баланс в текст главного экрана ДО перехода, чтобы Kivy не обнулился!
                 if self.sm.has_screen('main'):
                     self.sm.get_screen('main').label_score.text = f"{self.score}"
-                
-                # Безопасно пишем файл автовхода
-                try:
-                    with open("autoreg.txt", "w") as f:
-                        f.write(f"{self.nickname}:{self.temp_pass}")
-                except: pass
                     
                 Clock.schedule_once(lambda dt: self.enter_game(), 0)
                 return
@@ -638,7 +623,7 @@ class CyberClickerApp(App):
                 Clock.schedule_once(lambda dt: self.set_auth_info("Неверный пароль!"), 0)
                 return
 
-        # Если игрока нет на сервере — создаем ему чистую структуру jsonb
+        # Если игрок новый — создаем профиль и тоже пишем файл
         new_user_profile = {
             "password": str(self.temp_pass),
             "save_data": {
@@ -650,11 +635,17 @@ class CyberClickerApp(App):
         self.update_cloud_db(new_user_profile)
         
         try:
-            with open("autoreg.txt", "w") as f:
-                f.write(f"{self.nickname}:{self.temp_pass}")
-        except: pass
+            import os
+            data_dir = self.user_data_dir
+            file_path = os.path.join(data_dir, "autoreg.txt")
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(f"{str(self.nickname)}:{str(self.temp_pass)}")
+            print(f"[УСПЕХ] Создан новый аккаунт и записан файл авто-входа: {self.nickname}")
+        except Exception as e: 
+            print(f"[ОШИБКА ЗАПИСИ НОВОГО]: {e}")
             
         Clock.schedule_once(lambda dt: self.enter_game(), 0)
+
         
     def buy(self, key, name, power, is_hero):
         # ФИЧА №2: Блокировка покупки персонажей по перерождениям
@@ -786,7 +777,14 @@ class CyberClickerApp(App):
         btn.bind(on_press=popup.dismiss)
         box.add_widget(btn)
         
-        popup.open()
+        popup.open()\
+
+    def set_auth_info(self, text):
+        try:
+            if self.sm.has_screen('auth'):
+                self.sm.get_screen('auth').label_info.text = str(text)
+        except: 
+            pass
 
     def logout(self, *args):
         self.nickname = "GUEST"
