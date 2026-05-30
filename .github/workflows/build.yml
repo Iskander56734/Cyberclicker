@@ -22,10 +22,10 @@ jobs:
 
       - name: Build with Buildozer
         run: |
-          # Автоматически принимаем все ебучие лицензии Google Android SDK
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          # ЖЕСТКИЙ ХАК: заставляем сам Buildozer автоматически сожрать все лицензии Google Android SDK
+          buildozer android licenses
           
-          # Запускаем чистую сборку нашего APK
+          # Запускаем финальную сборку нашей мобильной игры
           buildozer android debug
 
           
