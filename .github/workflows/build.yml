@@ -18,9 +18,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential libsqlite3-dev sqlite3 bzip2 libbz2-dev libffi-dev xz-utils libssl-dev openssl libgdbm-dev libgdbm-compat-dev libreadline-dev libncursesw5-dev libtinfo-dev libgomp1
           pip install --upgrade pip
+          # ПРИНУДИТЕЛЬНО УДАЛЯЕМ ЛЮБОЙ НОВЫЙ СУКА СИЗОН
+          pip uninstall -y Cython
+          # СТАВИМ СТРОГО СТАБИЛЬНУЮ ВЕРСИЮ, КОТОРАЯ НЕ БАГУЕТ КИВИ
           pip install Cython==0.29.33 buildozer
 
       - name: Build with Buildozer
         run: |
-          # Теперь Buildozer сам примет лицензии благодаря галочке в spec-файле!
+          # Собираем игру по нашему spec-файлу
           buildozer android debug
