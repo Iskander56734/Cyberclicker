@@ -17,7 +17,7 @@ source.include_exts = py,png,json,txt
 
 # (list) Application requirements
 # Включаем только самые важные и проверенные библиотеки
-requirements = python3:3.10,kivy,requests,urllib3,certifi,idna,charset-normalizer
+requirements = python3,kivy==master,requests,urllib3,certifi,idna,charset-normalizer
 
 # (string) Custom source folders for requirements (if any)
 # source.include_patterns = assets/*,images/*.png
