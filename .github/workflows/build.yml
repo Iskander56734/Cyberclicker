@@ -20,12 +20,7 @@ jobs:
           pip install --upgrade pip
           pip install Cython==0.29.33 buildozer
 
-      - name: Check buildozer.spec
-        run: |
-          # Проверяем, что наш готовый вручную созданный файл на месте
-          ls -la buildozer.spec
-
       - name: Build with Buildozer
         run: |
-          # Автоматически жмём "ДА" на все лицензии Google Android
-          yes | buildozer android debug
+          # Теперь Buildozer сам примет лицензии благодаря галочке в spec-файле!
+          buildozer android debug
