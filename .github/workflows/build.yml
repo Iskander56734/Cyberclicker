@@ -18,18 +18,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential libsqlite3-dev sqlite3 bzip2 libbz2-dev libffi-dev xz-utils libssl-dev openssl libgdbm-dev libgdbm-compat-dev libreadline-dev libncursesw5-dev libtinfo-dev libgomp1
           pip install --upgrade pip
-          
-          # ЖЕСТКИЙ ХАК: Создаем глобальный конфиг, который запрещает ставить Cython 3+ во всей системе
-          mkdir -p ~/.config/pip
-          echo -e "[global]\nconstraints = constraints.txt" > ~/.config/pip/pip.conf
-          echo "Cython<3.0" > constraints.txt
-          
-          pip uninstall -y Cython
-          pip install Cython==0.29.33 buildozer
+          pip install Cython buildozer
 
       - name: Build with Buildozer
         run: |
-          # Дублируем запрет для внутренних потоков python-for-android
-          export PIP_CONSTRAINTS=$GITHUB_WORKSPACE/constraints.txt
-          
           buildozer android debug
