@@ -22,4 +22,11 @@ jobs:
 
       - name: Build with Buildozer
         run: |
-          buildozer android debug
+          buildozer android 
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyberclicker-apk
+          path: ./**/bin/*.apk
+
