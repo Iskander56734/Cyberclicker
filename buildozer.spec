@@ -29,6 +29,8 @@ version = 1.0
 # === САМАЯ ГЛАВНАЯ СТРОКА: ОТКРЫВАЕМ ЖЕЛЕЗНЫЙ ДОСТУП В ИНТЕРНЕТ ===
 android.permissions = INTERNET
 
+android.accept_sdk_license = True
+
 # (int) Target Android API, should be as high as possible.
 android.api = 33
 
