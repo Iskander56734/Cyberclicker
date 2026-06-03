@@ -89,20 +89,27 @@ class RegistrationScreen(Screen):
     # === МЕТОД ДОЛЖЕН СТОЯТЬ СТРОГО ТУТ! ===
     def on_enter(self):
         import os
-        data_dir = self.game.user_data_dir
-        file_path = os.path.join(data_dir, "autoreg.txt")
-        print(f"[ТЕСТ] Ищем файл авто-входа по пути: {file_path}")
-        
-        if os.path.exists(file_path):
-            try:
+        data_dir     def on_enter(self):
+        # Железная защита от вылета при самом первом запуске игры!
+        try:
+            import os
+            data_dir = self.game.user_data_dir
+            # Если папки еще нет в системе — создаем её принудительно
+            if not os.path.exists(data_dir):
+                os.makedirs(data_dir)
+                
+            file_path = os.path.join(data_dir, "autoreg.txt")
+            
+            if os.path.exists(file_path):
                 with open(file_path, "r", encoding="utf-8") as f:
                     saved_nick, saved_pass = f.read().split(":")
                 self.input_nick.text = str(saved_nick)
                 self.input_pass.text = str(saved_pass)
                 self.label_info.text = "Данные востановлены! Нажми подключиться!"
-                print(f"[УСПЕХ] Данные подтянулись в поля: {saved_nick}")
-            except Exception as e: 
-                print(f"[ОШИБКА ЧТЕНИЯ]: {e}")
+        except Exception as e:
+            # Если папки или файла нет — просто пишем статус, но НЕ вылетаем!
+            self.label_info.text = "Введите данные для входа в сеть"
+
 
     def start_login(self, instance):
         nick = self.input_nick.text.strip()
