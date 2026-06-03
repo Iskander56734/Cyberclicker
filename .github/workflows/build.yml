@@ -18,14 +18,29 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential libsqlite3-dev sqlite3 bzip2 libbz2-dev libffi-dev xz-utils libssl-dev openssl libgdbm-dev libgdbm-compat-dev libreadline-dev libncursesw5-dev libtinfo-dev libgomp1
           pip install --upgrade pip
-          pip install Cython buildozer
+          pip install Cython==0.29.33 buildozer
+
+      - name: Create and Configure buildozer.spec
+        run: |
+          # 1. Генерируем чистый файл настроек
+          buildozer init
+          
+          # 2. Включаем железное разрешение на ИНТЕРНЕТ
+          sed -i 's/#android.permissions = INTERNET/android.permissions = INTERNET/g' buildozer.spec
+          
+          # 3. Принудительно вшиваем нужные библиотеки в requirements
+          sed -i 's/requirements = python3,kivy/requirements = python3,kivy==master,requests,urllib3,certifi,idna,charset-normalizer/g' buildozer.spec
+          
+          # 4. Спускаем версию Android API до стабильной 31-й!
+          sed -i 's/android.api = 33/android.api = 31/g' buildozer.spec
 
       - name: Build with Buildozer
-        run: buildozer android debug
+        run: |
+          # Принудительно зажимаем кнопку "ДА" для всех лицензий Google
+          yes | buildozer android debug
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: cyberclicker-apk
           path: ./**/bin/*.apk
-
