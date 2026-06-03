@@ -22,13 +22,8 @@ jobs:
 
       - name: Hard-Fix Requirements
         run: |
-          # Впечатываем стабильный Kivy 2.3.0 прямо в настройки
+          # Принудительно прописываем стабильные требования в твой конфиг перед сборкой
           sed -i 's/requirements = .*/requirements = python3,kivy==2.3.0,requests,urllib3,certifi,idna,charset-normalizer/g' buildozer.spec
-
-      - name: Clean Buildozer Cache
-        run: |
-          # ЖЕСТКАЯ ОЧИСТКА КЭША: удаляем всё старое забагованное говно!
-          buildozer android clean
 
       - name: Build with Buildozer
         run: buildozer android debug
