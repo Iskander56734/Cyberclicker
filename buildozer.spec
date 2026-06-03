@@ -32,7 +32,7 @@ android.permissions = INTERNET
 android.accept_sdk_license = True
 
 # (int) Target Android API, should be as high as possible.
-android.api = 33
+android.api = 31
 
 # (int) Minimum API your APK will support.
 android.minapi = 21
