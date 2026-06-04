@@ -20,7 +20,7 @@ jobs:
           pip install --upgrade pip
           pip install Cython==0.29.33 buildozer
 
-       - name: Build with Buildozer
+      - name: Build with Buildozer
         run: buildozer android debug
 
       - name: Upload APK Artifact
