@@ -44,7 +44,7 @@ android.sdk = 33
 android.ndk = 25b
 
 # (bool) Use architectures
-android.archs = arm64-v8a, armeabi-v7a
+android.archs = arm64-v8a
 
 # (str) The Android card orientation (landscape, portrait or all)
 orientation = portrait
