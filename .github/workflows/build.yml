@@ -20,10 +20,8 @@ jobs:
           pip install --upgrade pip
           pip install Cython==0.29.33 buildozer
 
-      - name: Build with Buildozer
-        run: |
-          # Автоматически принимаем все лицензии Google через yes
-          yes | buildozer android debug
+       - name: Build with Buildozer
+        run: buildozer android debug
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
