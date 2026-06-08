@@ -10,7 +10,7 @@ source.dir = .
 source.include_exts = py,png,jpg,kv,atlas
 
 # СВЯЗКА ВЕКА: СТАБИЛЬНЫЙ ПИТОН 3.10 И КИВИ 2.3.0
-requirements = python3:3.10,kivy==2.3.0
+requirements = python3==3.10.11,kivy==2.3.0
 
 orientation = portrait
 fullscreen = 1
