@@ -4,13 +4,15 @@ package.name = cyberclicker
 package.domain = org.iskander
 
 # ЖЁСТКИЙ СБРОС КЭША СЕРВЕРА — СТАВИМ ВЕРСИЮ 0.3!
-version = 0.3
+version = 0.4
 
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas
 
 # СВЯЗКА ВЕКА: СТАБИЛЬНЫЙ ПИТОН 3.10 И КИВИ 2.3.0
 requirements = python3,kivy
+# Принудительно игнорируем сишные баги компиляции SSL и SQLite!
+p4a.blacklist = sqlite3,openssl,ssl,_ssl,_sqlite3
 
 orientation = portrait
 fullscreen = 1
