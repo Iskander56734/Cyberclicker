@@ -4,7 +4,7 @@ package.name = cyberclicker
 package.domain = org.iskander
 
 # ЖЁСТКИЙ СБРОС КЭША СЕРВЕРА — СТАВИМ ВЕРСИЮ 0.3!
-version = 0.4
+version = 0.5
 
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas
@@ -22,6 +22,9 @@ android.api = 31
 android.minapi = 21
 android.ndk = 25b
 android.private_storage = 1
+
+# ЖЕСТКО ЗАКАЗЫВАЕМ ПРАВА НА ПАМЯТЬ У АНДРОИДА ДЛЯ РАБОТЫ СОХРАНЕНИЙ!
+android.permissions = android.permission.WRITE_EXTERNAL_STORAGE, android.permission.READ_EXTERNAL_STORAGE
 
 # ПРИНУДИТЕЛЬНО ТОЛЬКО СОВРЕМЕННЫЙ 64-БИТНЫЙ КОРПУС!
 android.archs = arm64-v8a
