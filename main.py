@@ -17,6 +17,14 @@ from kivy.uix.popup import Popup
 from kivy.clock import Clock
 from kivy.core.window import Window
 from kivy.animation import Animation
+# НАМЕРТВО СВЯЗЫВАЕМ БАЗУ С СИСТЕМНОЙ ПАПКОЙ ИГРЫ ДЛЯ ОБХОДА БАГА AppData!
+import os
+from kivy.app import App
+
+# Получаем официальный путь к папке сохранения на ПК и на телефоне
+data_dir = App.get_running_app().user_data_dir if App.get_running_app() else os.getcwd()
+LOCAL_DB_FILE = os.path.join(data_dir, "cyber_player_base.json")
+
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 Window.clearcolor = (0.06, 0.09, 0.16, 1)
@@ -25,6 +33,13 @@ Window.clearcolor = (0.06, 0.09, 0.16, 1)
 SUPABASE_URL = "https://supabase.co"
 SUPABASE_KEY = "sb_publishable_HvLlvVVI8fz8rR6OSIDsqQ_mgXhml-K"
 LOCAL_DB_FILE = "cyber_player_base.json"
+# НАМЕРТВО ОБЪЯВЛЯЕМ ГЛОБАЛЬНЫЙ КЛИЕНТ ОБЛАКА SUPABASE ДЛЯ ВСЕХ ФУНКЦИЙ!
+try:
+    from supabase import create_client
+    supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
+except Exception as e:
+    print(f"[ОБЛАЧНЫЙ СБОЙ ИНИЦИАЛИЗАЦИИ]: {e}")
+    supabase_client = None
 
 # --- Функция красивого форматирования чисел (от k до VG) ---
 def format_num(num):
@@ -45,21 +60,50 @@ def format_num(num):
     except:
         return str(num)
 
+
+
 def load_local_db():
+    import os
+    import json
+    # Наш файл базы данных на диске ПК
+    LOCAL_DB_FILE = "cyber_player_base.json"
+    
     if os.path.exists(LOCAL_DB_FILE):
         try:
             with open(LOCAL_DB_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except:
-            pass
+                data = json.load(f)
+                if data and "users" in data:
+                    print("[ХАКЕР-БАЗА ЗАГРУЖЕНА]: Старые алмазы успешно подняты из файла!")
+                    return data
+        except Exception as e:
+            print(f"[ОШИБКА ЧТЕНИЯ]: {e}")
+            
+    # Если файла вообще нет, создаем чистую структуру
     return {"users": {}}
 
 def save_local_db(db):
+    import json
+    # 1. Намертво бэкапим алмазы в локальный JSON-файл на ПК
     try:
         with open(LOCAL_DB_FILE, "w", encoding="utf-8") as f:
             json.dump(db, f, ensure_ascii=False, indent=4)
-    except:
-        pass
+    except Exception as e:
+        print(f"[ОШИБКА ЛОКАЛЬНОГО БЭКАПА]: {e}")
+
+    # 2. Мгновенно пуляем обновлённые алмазы в облако Supabase по воздуху!
+    if supabase_client:
+        try:
+            # Прокручиваем базу и обновляем каждого хакера в облачной таблице
+            for username, user_data in db.get("users", {}).items():
+                supabase_client.table("players").upsert({
+                    "username": username,
+                    "diamonds": user_data.get("diamonds", 0),
+                    "score": user_data.get("score", 0)
+                }).execute()
+            print("[ОБЛАКО ОКОНЧАТЕЛЬНО СОХРАНЕНО]: Все алмазы залиты в Supabase! ☁️💎")
+        except Exception as e:
+            print(f"[ОБЛАЧНАЯ ОШИБКА ЗАПИСИ]: {e} (Данные сохранены локально!)")
+
 
 # --- 1. ЭКРАН ВХОДА ---
 class RegistrationScreen(Screen):
@@ -89,27 +133,20 @@ class RegistrationScreen(Screen):
     # === МЕТОД ДОЛЖЕН СТОЯТЬ СТРОГО ТУТ! ===
     def on_enter(self):
         import os
-        data_dir     def on_enter(self):
-        # Железная защита от вылета при самом первом запуске игры!
-        try:
-            import os
-            data_dir = self.game.user_data_dir
-            # Если папки еще нет в системе — создаем её принудительно
-            if not os.path.exists(data_dir):
-                os.makedirs(data_dir)
-                
-            file_path = os.path.join(data_dir, "autoreg.txt")
-            
-            if os.path.exists(file_path):
+        data_dir = self.game.user_data_dir
+        file_path = os.path.join(data_dir, "autoreg.txt")
+        print(f"[ТЕСТ] Ищем файл авто-входа по пути: {file_path}")
+        
+        if os.path.exists(file_path):
+            try:
                 with open(file_path, "r", encoding="utf-8") as f:
                     saved_nick, saved_pass = f.read().split(":")
                 self.input_nick.text = str(saved_nick)
                 self.input_pass.text = str(saved_pass)
                 self.label_info.text = "Данные востановлены! Нажми подключиться!"
-        except Exception as e:
-            # Если папки или файла нет — просто пишем статус, но НЕ вылетаем!
-            self.label_info.text = "Введите данные для входа в сеть"
-
+                print(f"[УСПЕХ] Данные подтянулись в поля: {saved_nick}")
+            except Exception as e: 
+                print(f"[ОШИБКА ЧТЕНИЯ]: {e}")
 
     def start_login(self, instance):
         nick = self.input_nick.text.strip()
@@ -412,8 +449,12 @@ class CyberClickerApp(App):
         self.sm.add_widget(ShopScreen(name='shop'))
         self.sm.add_widget(LeaderboardScreen(name='leaderboard'))
         Clock.schedule_interval(self.add_passive, 1.0)
-        Clock.schedule_interval(self.save_to_cloud_tick, 30.0)
+        Clock.schedule_interval(self.save_to_cloud_tick, 5.0)
+        # НАМЕРТВО ЗАГРУЖАЕМ ЛОКАЛЬНУЮ БАЗУ ИГРОКОВ ПРИ СТАРТЕ ИГРЫ!
+        self.db = load_local_db()
+        
         return self.sm
+
 
     def set_auth_info(self, text):
         try:
@@ -434,26 +475,20 @@ class CyberClickerApp(App):
             self.local_save_only()
 
     def local_save_only(self):
-        # Локальный бэкап на устройстве
+        # Насильно заставляем старую функцию писать в наш правильный JSON-файл!
+        import json
         try:
-            import json
-            current_user_data = {
-                "password": self.temp_pass,
-                "save_data": {
-                    "score": self.score, "income": self.income, "passive": self.passive_income,
-                    "rebirths": self.rebirths, "brawler": self.current_brawler, "prices": self.prices,
-                    "owned_brawlers": self.owned_brawlers
-                }
-            }
-            with open("local_save.json", "w", encoding="utf-8") as f:
-                json.dump(current_user_data, f, ensure_ascii=False, indent=4)
-        except: pass
+            with open("cyber_player_base.json", "w", encoding="utf-8") as f:
+                json.dump(self.db, f, ensure_ascii=False, indent=4)
+        except Exception as e:
+            print(f"[ОШИБКА СОХРАНЕНИЯ В КЛИКЕ]: {e}")
 
     def save_to_cloud_tick(self, dt):
         if self.nickname != "GUEST" and self.sm.current != 'auth':
-            full_db = load_local_db()
-            if "users" not in full_db: full_db["users"] = {}
-            full_db["users"][self.nickname] = {
+            db = load_local_db() # ИСПРАВИЛИ НА ПРАВИЛЬНОЕ ИМЯ ФУНКЦИИ
+            # Заменяем кривое слово full_db на db, которую мы прочитали строкой выше!
+            if "users" not in db: db["users"] = {}
+            db["users"][self.nickname] = {
                 "password": self.temp_pass,
                 "save_data": {
                     "score": self.score, "income": self.income, "passive": self.passive_income,
@@ -461,7 +496,7 @@ class CyberClickerApp(App):
                     "owned_brawlers": self.owned_brawlers
                 }
             }
-            self.update_cloud_db(full_db)
+            self.update_cloud_db(db)
 
     def get_cloud_db(self):
         # Мобильный запрос через UrlRequest (телефон его не заблокирует)
@@ -495,6 +530,43 @@ class CyberClickerApp(App):
 
     def process_mobile_login(self, user_cloud_data):
         import json
+        import os
+
+        # === 1. ХАКЕРСКИЙ ФИКС: ЕСЛИ ОБЛАКО НА ПК НЕ ОТВЕЧАЕТ, ЖЕСТКО ЧИТАЕМ С ДИСКА! ===
+        if not user_cloud_data:
+            if os.path.exists("cyber_player_base.json"):
+                try:
+                    with open("cyber_player_base.json", "r", encoding="utf-8") as f:
+                        local_data = json.load(f)
+                        if local_data and "users" in local_data and self.nickname in local_data["users"]:
+                            loc_user = local_data["users"][self.nickname]
+                            
+                            # НАМЕРТВО ПРОВЕРЯЕМ ВСЕ КЛЮЧИ В ПРАВИЛЬНОМ БЛОКЕ!
+                            if "diamonds" in loc_user:
+                                self.score = int(loc_user.get("diamonds", 0))
+                            else:
+                                self.score = int(loc_user.get("score", 0))
+                                
+                            self.income = int(loc_user.get("income", 1))
+                            self.passive_income = int(loc_user.get("passive", 0))
+                            self.rebirths = int(loc_user.get("rebirths", 0))
+                            self.current_brawler = str(loc_user.get("brawler", "Новичок"))
+                            self.owned_brawlers = loc_user.get("owned_brawlers", ["Новичок"])
+                            
+                            # Синхронизируем базу в памяти приложения
+                            self.db = local_data
+                            
+                            # Обновляем счетчик алмазов на главном экране Kivy
+                            if self.sm.has_screen('main'):
+                                self.sm.get_screen('main').label_score.text = f"{self.score}"
+                            
+                            # Врубаем авто-вход без вандального зануления очков!
+                            Clock.schedule_once(lambda dt: self.enter_game(), 0)
+                            return
+                except Exception as e:
+                    print(f"[ОШИБКА ЧТЕНИЯ БЭКАПА]: {e}")
+
+        # === 2. СТАНДАРТНАЯ ЛОГИКА ОБЛАКА (ОСТАВЛЯЕМ ДЛЯ ТЕЛЕФОНА) ===
         if user_cloud_data:
             saved_pass = user_cloud_data.get("password")
             save_data = user_cloud_data.get("save_data", {})
@@ -503,7 +575,10 @@ class CyberClickerApp(App):
 
             if saved_pass == self.temp_pass or not saved_pass:
                 if isinstance(save_data, dict):
-                    self.score = int(save_data.get("score", 0))
+                    if "diamonds" in save_data:
+                        self.score = int(save_data.get("diamonds", 0))
+                    else:
+                        self.score = int(save_data.get("score", 0))
                     self.income = int(save_data.get("income", 1))
                     self.passive_income = int(save_data.get("passive", 0))
                     self.rebirths = int(save_data.get("rebirths", 0))
@@ -511,24 +586,30 @@ class CyberClickerApp(App):
                     self.owned_brawlers = save_data.get("owned_brawlers", ["Новичок"])
                     if "prices" in save_data:
                         self.prices.update(save_data.get("prices", {}))
-                
+
                 if self.sm.has_screen('main'):
                     self.sm.get_screen('main').label_score.text = f"{self.score}"
                 try:
                     with open("autoreg.txt", "w") as f:
                         f.write(f"{self.nickname}:{self.temp_pass}")
-                except: pass
+                except:
+                    pass
                 Clock.schedule_once(lambda dt: self.enter_game(), 0)
                 return
             else:
                 Clock.schedule_once(lambda dt: self.set_auth_info("Неверный пароль!"), 0)
                 return
 
+        # === 3. СОЗДАНИЕ ПРОФИЛЯ С ДВОЙНЫМ КЛЮЧОМ ДЛЯ ЗАЩИТЫ ОТ СБРОСОВ ===
         new_user_profile = {
             "password": str(self.temp_pass),
             "save_data": {
-                "score": int(self.score), "income": int(self.income), "passive": int(self.passive_income),
-                "rebirths": int(self.rebirths), "brawler": str(self.current_brawler), "prices": self.prices,
+                "diamonds": int(self.score),
+                "score": int(self.score),
+                "income": int(self.income),
+                "passive": int(self.passive_income),
+                "rebirths": int(self.rebirths),
+                "brawler": str(self.current_brawler),
                 "owned_brawlers": self.owned_brawlers
             }
         }
@@ -536,7 +617,8 @@ class CyberClickerApp(App):
         try:
             with open("autoreg.txt", "w") as f:
                 f.write(f"{self.nickname}:{self.temp_pass}")
-        except: pass
+        except:
+            pass
         Clock.schedule_once(lambda dt: self.enter_game(), 0)
 
     def update_cloud_db(self, full_db):
@@ -731,7 +813,7 @@ class CyberClickerApp(App):
             if self.sm.has_screen('shop'): self.sm.get_screen('shop').update_buttons()
 
     def click(self):
-        # (Тут твоя проверка энергии)
+        # 1. Твоя проверка энергии
         if self.energy < 1:
             if self.sm.has_screen('main'):
                 self.sm.get_screen('main').btn_click.text = "НЕТ ЭНЕРГИИ!"
@@ -740,7 +822,8 @@ class CyberClickerApp(App):
 
         self.energy -= 1
 
-        # ИСПРАВЛЕННАЯ ЛОГИКА КЛИКА С УЧЕТОМ ПЕРЕРОЖДЕНИЙ ДЛЯ ВСЕХ ГЕРОЕВ
+        # 2. Логика клика с учетом перерождений для всех героев
+        import random
         bonus_multiplier = 1 + (self.rebirths * 0.5) # Твои +50% за каждое перерождение
 
         if self.current_brawler == "Школьник-Читер":
@@ -752,12 +835,23 @@ class CyberClickerApp(App):
         else:
             # Обычный клик теперь ЖЕЛЕЗНО умножается на бонус перерождений!
             self.score += int(self.income * bonus_multiplier)
-        
+
+        # Старый вызов резервного сохранения (пусть будет для подстраховки)
         self.local_save_only()
         self.click_count += 1
+
+        # 3. ХАКЕРСКИЙ ФИКС: Принудительно связываем набитые алмазы экрана с глобальной базой!
+        app = App.get_running_app()
+        if app.db and "users" in app.db and app.nickname in app.db["users"]:
+            app.db["users"][app.nickname]["diamonds"] = self.score
+            # Намертво шлёпаем обновленный словарь на жёсткий диск в файл json!
+            save_local_db(app.db)
+
+        # 4. Твой автоматический тик отправки в облако каждые 10 кликов
         if self.click_count >= 10:
             self.click_count = 0
             self.save_to_cloud_tick(0)
+
 
     def get_price(self, key):
         return self.prices.get(key, 0)
