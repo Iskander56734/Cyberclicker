@@ -22,7 +22,20 @@ import os
 from kivy.app import App
 
 # Получаем официальный путь к папке сохранения на ПК и на телефоне
-data_dir = App.get_running_app().user_data_dir if App.get_running_app() else os.getcwd()
+import os
+
+# СТРОГИЙ СИСТЕМНЫЙ ПУТЬ: На ПК пишем локально в папку игры, на телефоне — в песочницу Андроида!
+try:
+    from kivy.utils import platform
+    if platform == "android":
+        from kivy.app import App
+        data_dir = App.get_running_app().user_data_dir if App.get_running_app() else os.getcwd()
+    else:
+        # На компьютере Windows принудительно пишем в папку со скриптом, без всяких AppData!
+        data_dir = os.path.dirname(os.path.abspath(__file__)) if '__file__' in locals() else os.getcwd()
+except:
+    data_dir = os.getcwd()
+
 LOCAL_DB_FILE = os.path.join(data_dir, "cyber_player_base.json")
 
 
@@ -463,7 +476,24 @@ class CyberClickerApp(App):
 
 
     def enter_game(self):
-        self.sm.current = 'main'
+        # 1. Сначала официально переключаем экран на главный игровой!
+        for screen_name in ['main', 'game', 'clicker', 'game_screen']:
+            if self.sm.has_screen(screen_name):
+                self.sm.current = screen_name
+                break
+                
+        # 2. ЖЕСТКИЙ КАРАТЕЛЬНЫЙ ФИКС: Перерисовываем цифры, когда экран УЖЕ АКТИВЕН!
+        Clock.schedule_once(self.force_update_ui, 0.1)
+
+    def force_update_ui(self, dt):
+        # Метод пулей пробегается по меткам и заменяет графический ноль на твои реальные алмазы!
+        for screen_name in ['main', 'game', 'clicker', 'game_screen']:
+            if self.sm.has_screen(screen_name):
+                scr = self.sm.get_screen(screen_name)
+                for label_attr in ['label_score', 'score_label', 'diamonds_label']:
+                    if hasattr(scr, label_attr):
+                        getattr(scr, label_attr).text = str(self.score)
+                        print(f"[ГРАФИКА ОЖИЛА]: Насильно нарисовали {self.score} алмазов на экране {screen_name}!")
 
     def add_passive(self, dt):
         if self.energy < self.max_energy:
@@ -484,19 +514,29 @@ class CyberClickerApp(App):
             print(f"[ОШИБКА СОХРАНЕНИЯ В КЛИКЕ]: {e}")
 
     def save_to_cloud_tick(self, dt):
-        if self.nickname != "GUEST" and self.sm.current != 'auth':
-            db = load_local_db() # ИСПРАВИЛИ НА ПРАВИЛЬНОЕ ИМЯ ФУНКЦИИ
-            # Заменяем кривое слово full_db на db, которую мы прочитали строкой выше!
-            if "users" not in db: db["users"] = {}
-            db["users"][self.nickname] = {
-                "password": self.temp_pass,
-                "save_data": {
-                    "score": self.score, "income": self.income, "passive": self.passive_income,
-                    "rebirths": self.rebirths, "brawler": self.current_brawler, "prices": self.prices,
-                    "owned_brawlers": self.owned_brawlers
-                }
-            }
-            self.update_cloud_db(db)
+        # Проверяем, создан ли вообще клиент облака
+        if not supabase_client:
+            return
+
+        import threading
+        
+        def run_cloud_save():
+            try:
+                # НАМЕРТВО СИНХРОНИЗИРУЕМ ВСЕ НАЗВАНИЯ КОЛОНОК ДЛЯ СУПАБАЗЕ!
+                # Стучимся в таблицу 'players', находим твой ник и жестко обновляем данные!
+                supabase_client.table("players").update({
+                    "diamonds": int(self.score),  # Убедись, что колонка в Supabase называется так же!
+                    "score": int(self.score),     # Закидываем в оба ключа для стопроцентной защиты
+                    "income": int(self.income),
+                    "rebirths": int(self.rebirths)
+                }).eq("username", self.nickname).execute()
+                
+                print("[ОБЛАКО КЛИКЕРА]: Баланс успешно улетел и сохранен в Supabase! ☁️💎")
+            except Exception as e:
+                print(f"[ОБЛАЧНЫЙ СБОЙ ЗАПИСИ]: {e}")
+
+        # Пускаем отправку в изолированный поток, чтобы телефон никогда не зависал при кликах!
+        threading.Thread(target=run_cloud_save, daemon=True).start()
 
     def get_cloud_db(self):
         # Мобильный запрос через UrlRequest (телефон его не заблокирует)
@@ -534,9 +574,9 @@ class CyberClickerApp(App):
 
         # === 1. ХАКЕРСКИЙ ФИКС: ЕСЛИ ОБЛАКО НА ПК НЕ ОТВЕЧАЕТ, ЖЕСТКО ЧИТАЕМ С ДИСКА! ===
         if not user_cloud_data:
-            if os.path.exists("cyber_player_base.json"):
+            if os.path.exists(LOCAL_DB_FILE):
                 try:
-                    with open("cyber_player_base.json", "r", encoding="utf-8") as f:
+                    with open(LOCAL_DB_FILE, "r", encoding="utf-8") as f:
                         local_data = json.load(f)
                         if local_data and "users" in local_data and self.nickname in local_data["users"]:
                             loc_user = local_data["users"][self.nickname]
@@ -556,9 +596,13 @@ class CyberClickerApp(App):
                             # Синхронизируем базу в памяти приложения
                             self.db = local_data
                             
-                            # Обновляем счетчик алмазов на главном экране Kivy
-                            if self.sm.has_screen('main'):
-                                self.sm.get_screen('main').label_score.text = f"{self.score}"
+                            # НАСИЛЬНО ЗАСТАВЛЯЕМ KIVY ПЕРЕРИСОВАТЬ ГРАФИКУ И ПОКАЗАТЬ ЦИФРУ!
+                            for screen_name in ['main', 'game', 'clicker', 'game_screen']:
+                                if self.sm.has_screen(screen_name):
+                                    scr = self.sm.get_screen(screen_name)
+                                    for label_attr in ['label_score', 'score_label', 'diamonds_label']:
+                                        if hasattr(scr, label_attr):
+                                            getattr(scr, label_attr).text = str(self.score)
                             
                             # Врубаем авто-вход без вандального зануления очков!
                             Clock.schedule_once(lambda dt: self.enter_game(), 0)
@@ -587,8 +631,13 @@ class CyberClickerApp(App):
                     if "prices" in save_data:
                         self.prices.update(save_data.get("prices", {}))
 
-                if self.sm.has_screen('main'):
-                    self.sm.get_screen('main').label_score.text = f"{self.score}"
+                for screen_name in ['main', 'game', 'clicker', 'game_screen']:
+                    if self.sm.has_screen(screen_name):
+                        scr = self.sm.get_screen(screen_name)
+                        for label_attr in ['label_score', 'score_label', 'diamonds_label']:
+                            if hasattr(scr, label_attr):
+                                getattr(scr, label_attr).text = str(self.score)
+
                 try:
                     with open("autoreg.txt", "w") as f:
                         f.write(f"{self.nickname}:{self.temp_pass}")
@@ -600,7 +649,32 @@ class CyberClickerApp(App):
                 Clock.schedule_once(lambda dt: self.set_auth_info("Неверный пароль!"), 0)
                 return
 
-        # === 3. СОЗДАНИЕ ПРОФИЛЯ С ДВОЙНЫМ КЛЮЧОМ ДЛЯ ЗАЩИТЫ ОТ СБРОСОВ ===
+        # === 3. ЖЕСТКАЯ ЗАЩИТА ЛОКАЛЬНОЙ БАЗЫ ОТ ЗАТИРАНИЯ НУЛЯМИ ===
+        if os.path.exists(LOCAL_DB_FILE):
+            try:
+                with open(LOCAL_DB_FILE, "r", encoding="utf-8") as f:
+                    check_data = json.load(f)
+                    if check_data and "users" in check_data and self.nickname in check_data["users"]:
+                        print("[ЗАЩИТА СРАБОТАЛА]: Профиль Искандера уже в базе, отменяем вандальное создание нулей!")
+                        
+                        # Подтягиваем локальные данные перед входом
+                        loc_user = check_data["users"][self.nickname]
+                        self.score = int(loc_user.get("diamonds", loc_user.get("score", 0)))
+                        
+                        # Принудительно рисуем их на экране
+                        for screen_name in ['main', 'game', 'clicker', 'game_screen']:
+                            if self.sm.has_screen(screen_name):
+                                scr = self.sm.get_screen(screen_name)
+                                for label_attr in ['label_score', 'score_label', 'diamonds_label']:
+                                    if hasattr(scr, label_attr):
+                                        getattr(scr, label_attr).text = str(self.score)
+                                        
+                        Clock.schedule_once(lambda dt: self.enter_game(), 0)
+                        return
+            except:
+                pass
+
+        # === 4. СОЗДАНИЕ ПРОФИЛЯ, ЕСЛИ ДАННЫХ НЕТ ВООБЩЕ НИГДЕ (ПЕРВЫЙ ЗАПУСК ИГРЫ) ===
         new_user_profile = {
             "password": str(self.temp_pass),
             "save_data": {
