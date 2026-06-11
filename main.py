@@ -24,18 +24,21 @@ from kivy.app import App
 # Получаем официальный путь к папке сохранения на ПК и на телефоне
 import os
 
-# СТРОГИЙ СИСТЕМНЫЙ ПУТЬ: На ПК пишем локально в папку игры, на телефоне — в песочницу Андроида!
+# СУПЕР-МОБИЛЬНЫЙ ПУТЬ ДЛЯ АНДРОИДА: Пишем строго во внутреннюю защищенную песочницу приложения!
 try:
     from kivy.utils import platform
     if platform == "android":
-        from kivy.app import App
-        data_dir = App.get_running_app().user_data_dir if App.get_running_app() else os.getcwd()
+        # Андроид на 1000% разрешает писать файлы в эту личную системную папку игры!
+        from android.storage import app_storage_dir
+        data_dir = app_storage_dir()
     else:
-        # На компьютере Windows принудительно пишем в папку со скриптом, без всяких AppData!
+        # На компе Windows спокойно пишем локально в папку со скриптом
         data_dir = os.path.dirname(os.path.abspath(__file__)) if '__file__' in locals() else os.getcwd()
-except:
+except Exception as e:
+    print(f"[ПРАВКА ПУТИ]: {e}")
     data_dir = os.getcwd()
 
+# Намертво склеиваем путь к нашей базе данных
 LOCAL_DB_FILE = os.path.join(data_dir, "cyber_player_base.json")
 
 
