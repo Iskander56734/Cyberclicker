@@ -4,7 +4,7 @@ package.name = cyberclicker
 package.domain = org.iskander
 
 # ЖЁСТКИЙ СБРОС КЭША СЕРВЕРА — СТАВИМ ВЕРСИЮ 0.3!
-version = 0.6
+version = 0.7
 
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas
@@ -35,7 +35,7 @@ android.accept_sdk_license = True
 [buildozer]
 log_level = 2
 warn_on_root = 1
-
-# ИКОНКА НАШЕГО ПАЦАНСКОГО КЛИКЕРА НА ЭКРАНЕ ТЕЛЕФОНА!
 icon.filename = icon.png
+
+# ИКОНКА НАШЕГО ПАЦАНСКОГО КЛИКЕРА НА ЭКРАНЕ Т
 
